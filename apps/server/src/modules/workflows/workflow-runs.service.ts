@@ -1,8 +1,9 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { AGGREGATE, EVENT, makeEvent, newId } from '../../events';
 import { EVENT_STORE, type EventStore, type DomainEvent } from '../../events';
 import { JobRegistry } from './job-registry';
 import type { JobSpec, JobStatus, RunMeta, RunStatus } from './workflow.types';
+import { NotifyService } from '../notify/notify.service';
 
 export interface RunJobView {
   id: string;
@@ -13,6 +14,7 @@ export interface RunJobView {
 export interface RunView {
   id: string;
   workflowId: string;
+  workflowName: string;
   traceId: string;
   status: RunStatus;
   jobs: RunJobView[];
@@ -28,6 +30,7 @@ export class WorkflowRunsService {
   constructor(
     @Inject(EVENT_STORE) private readonly eventStore: EventStore,
     private readonly jobRegistry: JobRegistry,
+    @Optional() private readonly notify?: NotifyService,
   ) {}
 
   async startRun(workflowId: string, actorId: string, meta?: RunMeta): Promise<RunView> {
@@ -42,6 +45,7 @@ export class WorkflowRunsService {
     const view: RunView = {
       id: runId,
       workflowId,
+      workflowName: workflow.payload.name as string,
       traceId: workflow.traceId,
       status: 'running',
       jobs: spec.jobs.map((j) => ({ id: j.id, type: j.type, status: 'pending' as JobStatus })),
@@ -61,6 +65,10 @@ export class WorkflowRunsService {
 
   get(runId: string): RunView | null {
     return this.runs.get(runId) ?? null;
+  }
+
+  list(): RunView[] {
+    return [...this.runs.values()].sort((a, b) => b.startedAt.localeCompare(a.startedAt));
   }
 
   async trace(runId: string): Promise<DomainEvent[]> {
@@ -144,6 +152,11 @@ export class WorkflowRunsService {
     view.status = status;
     view.finishedAt = new Date().toISOString();
     await this.emit(view.traceId, EVENT.runCompleted, view.id, { runId: view.id, status });
+    try {
+      await this.notify?.runCompleted(view, view.workflowName);
+    } catch (err) {
+      console.warn(`[notify] run notification failed: ${String(err)}`);
+    }
   }
 
   private emit(traceId: string, type: string, aggregateId: string, payload: Record<string, unknown>): Promise<void> {

@@ -1,65 +1,76 @@
+import { useEffect, useState, type ReactNode } from 'react';
+import Dashboard from './pages/Dashboard';
+import Services from './pages/Services';
+import WorkItems from './pages/WorkItems';
+import Workflows from './pages/Workflows';
+import { Runs, RunDetail } from './pages/Runs';
+import Onboarding from './pages/Onboarding';
+import CommandPalette from './components/CommandPalette';
+
+const NAV = [
+  { hash: '#/', label: '工作台' },
+  { hash: '#/onboarding', label: '上手向导' },
+  { hash: '#/services', label: '服务目录' },
+  { hash: '#/work-items', label: '需求与任务' },
+  { hash: '#/workflows', label: '流水线' },
+  { hash: '#/runs', label: '运行记录' },
+];
+
+function useHashRoute(): string {
+  const [route, setRoute] = useState(() => window.location.hash || '#/');
+  useEffect(() => {
+    const onChange = (): void => setRoute(window.location.hash || '#/');
+    window.addEventListener('hashchange', onChange);
+    return () => window.removeEventListener('hashchange', onChange);
+  }, []);
+  return route;
+}
+
 export default function App() {
+  const route = useHashRoute();
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
-    <main style={styles.main}>
-      <div style={styles.badge}>Phase 0 · Scaffold</div>
-      <h1 style={styles.title}>JackDevOps</h1>
-      <p style={styles.subtitle}>
-        开源的、AI-ready 的全流程 DevOps 平台 —— 需求 → 开发 → 测试 → 发布 → 运维
-      </p>
-      <ul style={styles.list}>
-        <li>服务目录为轴心，一切实体皆目录中的实体</li>
-        <li>事件溯源 + 变更指纹，全链路可追溯</li>
-        <li>北极星指标：安装到首条流水线 ≤ 10 分钟</li>
-      </ul>
-      <p style={styles.footer}>
-        文档见 <code>docs/</code> · API 健康检查 <code>GET /health</code>
-      </p>
-    </main>
+    <div className="layout">
+      <nav className="sidebar">
+        <div className="brand">JackDevOps</div>
+        {NAV.map((item) => (
+          <a
+            key={item.hash}
+            href={item.hash}
+            className={route === item.hash || (item.hash !== '#/' && route.startsWith(item.hash)) ? 'active' : ''}
+          >
+            {item.label}
+          </a>
+        ))}
+        <div className="hint">
+          按 <span className="kbd">Ctrl K</span> 打开命令面板
+        </div>
+      </nav>
+      <main className="content">{renderRoute(route)}</main>
+      {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
+    </div>
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  main: {
-    minHeight: '100vh',
-    background: '#0d1117',
-    color: '#e6edf3',
-    fontFamily:
-      'ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-    padding: 24,
-    textAlign: 'center',
-  },
-  badge: {
-    border: '1px solid #30363d',
-    borderRadius: 999,
-    padding: '4px 14px',
-    fontSize: 13,
-    color: '#8b949e',
-  },
-  title: {
-    fontSize: 48,
-    margin: 0,
-    background: 'linear-gradient(90deg, #58a6ff, #bc8cff)',
-    WebkitBackgroundClip: 'text',
-    color: 'transparent',
-  },
-  subtitle: {
-    fontSize: 18,
-    color: '#8b949e',
-    margin: 0,
-  },
-  list: {
-    textAlign: 'left',
-    color: '#c9d1d9',
-    lineHeight: 2,
-    margin: 0,
-  },
-  footer: {
-    color: '#8b949e',
-    fontSize: 14,
-  },
-};
+function renderRoute(route: string): ReactNode {
+  if (route === '#/') return <Dashboard />;
+  if (route.startsWith('#/onboarding')) return <Onboarding />;
+  if (route.startsWith('#/services')) return <Services />;
+  if (route.startsWith('#/work-items')) return <WorkItems />;
+  if (route.startsWith('#/workflows')) return <Workflows />;
+  if (route.startsWith('#/runs/')) return <RunDetail id={route.slice('#/runs/'.length)} />;
+  if (route.startsWith('#/runs')) return <Runs />;
+  return <Dashboard />;
+}

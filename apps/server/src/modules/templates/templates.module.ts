@@ -7,5 +7,6 @@ import { WorkflowsModule } from '../workflows/workflows.module';
   imports: [WorkflowsModule],
   controllers: [TemplatesController],
   providers: [TemplatesService],
+  exports: [TemplatesService],
 })
 export class TemplatesModule {}

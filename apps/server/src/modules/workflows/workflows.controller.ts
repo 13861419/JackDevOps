@@ -40,6 +40,11 @@ export class WorkflowsController {
 export class RunsController {
   constructor(private readonly runs: WorkflowRunsService) {}
 
+  @Get()
+  list() {
+    return this.runs.list();
+  }
+
   @Get(':id')
   get(@Param('id') id: string) {
     return this.runs.get(id) ?? null;
