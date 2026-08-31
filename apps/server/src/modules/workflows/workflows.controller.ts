@@ -3,6 +3,7 @@ import { WorkflowsService } from './workflows.service';
 import { WorkflowRunsService } from './workflow-runs.service';
 import { createWorkflowDto, workflowSpecDto, type CreateWorkflowDto } from './workflows.dto';
 import { ZodValidationPipe } from '../../shared/zod.pipe';
+import { Roles } from '../auth/auth.guard';
 
 @Controller('workflows')
 export class WorkflowsController {
@@ -12,6 +13,7 @@ export class WorkflowsController {
   ) {}
 
   @Post()
+  @Roles('admin', 'pm', 'dev')
   create(@Body(new ZodValidationPipe(createWorkflowDto)) dto: CreateWorkflowDto) {
     return this.workflows.create(dto);
   }
@@ -31,6 +33,7 @@ export class WorkflowsController {
   }
 
   @Post(':id/runs')
+  @Roles('admin', 'dev', 'ops')
   async startRun(@Param('id') id: string) {
     return this.runs.startRun(id, 'api');
   }

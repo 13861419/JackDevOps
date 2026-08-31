@@ -2,6 +2,7 @@ import { Body, ConflictException, Controller, Get, Param, Post } from '@nestjs/c
 import { CatalogService } from './catalog.service';
 import { registerServiceDto, type RegisterServiceDto } from './catalog.dto';
 import { ZodValidationPipe } from '../../shared/zod.pipe';
+import { Roles } from '../auth/auth.guard';
 import type { DomainEvent } from '../../events';
 
 @Controller('services')
@@ -9,6 +10,7 @@ export class CatalogController {
   constructor(private readonly catalog: CatalogService) {}
 
   @Post()
+  @Roles('admin', 'pm')
   register(@Body(new ZodValidationPipe(registerServiceDto)) dto: RegisterServiceDto) {
     return this.catalog.register(dto);
   }
