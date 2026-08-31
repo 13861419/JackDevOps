@@ -6,6 +6,8 @@ import Workflows from './pages/Workflows';
 import { Runs, RunDetail } from './pages/Runs';
 import Onboarding from './pages/Onboarding';
 import Flags from './pages/Flags';
+import Tests from './pages/Tests';
+import Audit from './pages/Audit';
 import CommandPalette from './components/CommandPalette';
 import AiSidebar from './components/AiSidebar';
 
@@ -16,7 +18,9 @@ const NAV = [
   { hash: '#/work-items', label: '需求与任务' },
   { hash: '#/workflows', label: '流水线' },
   { hash: '#/runs', label: '运行记录' },
+  { hash: '#/tests', label: '测试管理' },
   { hash: '#/flags', label: '特性开关' },
+  { hash: '#/audit', label: '审计' },
 ];
 
 function useHashRoute(): string {
@@ -79,6 +83,8 @@ function renderRoute(route: string): ReactNode {
   if (route.startsWith('#/work-items')) return <WorkItems />;
   if (route.startsWith('#/workflows')) return <Workflows />;
   if (route.startsWith('#/flags')) return <Flags />;
+  if (route.startsWith('#/tests')) return <Tests />;
+  if (route.startsWith('#/audit')) return <Audit />;
   if (route.startsWith('#/runs/')) return <RunDetail id={route.slice('#/runs/'.length)} />;
   if (route.startsWith('#/runs')) return <Runs />;
   return <Dashboard />;

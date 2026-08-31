@@ -109,4 +109,14 @@ export class PgEventStore implements EventStore, OnModuleInit {
     const rows = await this.db.select().from(domainEvents).where(sql`${domainEvents.type} = ${type}`);
     return rows.map((r) => this.mapRow(r));
   }
+
+  async listAll(limit = 100, offset = 0): Promise<DomainEvent[]> {
+    const rows = await this.db
+      .select()
+      .from(domainEvents)
+      .orderBy(sql`${domainEvents.seq} DESC`)
+      .limit(limit)
+      .offset(offset);
+    return rows.map((r) => this.mapRow(r));
+  }
 }

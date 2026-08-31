@@ -13,6 +13,8 @@ import { AiModule } from './modules/ai/ai.module';
 import { ReleasesModule } from './modules/releases/releases.module';
 import { FlagsModule } from './modules/flags/flags.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
+import { TestsModule } from './modules/tests/tests.module';
+import { AuditModule } from './modules/audit/audit.module';
 
 @Module({
   imports: [
@@ -30,6 +32,8 @@ import { MetricsModule } from './modules/metrics/metrics.module';
     ReleasesModule,
     FlagsModule,
     MetricsModule,
+    TestsModule,
+    AuditModule,
   ],
 })
 export class AppModule {}

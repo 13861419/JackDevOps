@@ -83,6 +83,7 @@ export class WorkflowRunsService {
     const succeeded = new Set<string>();
     const failed = new Set<string>();
     const pending = new Map(jobs.map((j) => [j.id, j]));
+    const maxConcurrency = Number(process.env.JACK_MAX_CONCURRENCY ?? 8);
 
     while (pending.size > 0) {
       const ready = [...pending.values()].filter((j) =>
@@ -91,8 +92,9 @@ export class WorkflowRunsService {
       if (ready.length === 0) {
         break;
       }
-      await Promise.all(ready.map((job) => this.runJob(job, view)));
-      for (const job of ready) {
+      const bounded = maxConcurrency > 0 ? ready.slice(0, maxConcurrency) : ready;
+      await Promise.all(bounded.map((job) => this.runJob(job, view)));
+      for (const job of bounded) {
         pending.delete(job.id);
         const jobView = view.jobs.find((jv) => jv.id === job.id);
         if (jobView?.status === 'succeeded') {

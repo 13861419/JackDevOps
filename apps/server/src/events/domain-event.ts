@@ -27,6 +27,8 @@ export const AGGREGATE = {
   ai: 'ai',
   release: 'release',
   flag: 'flag',
+  testSuite: 'testsuite',
+  testRun: 'testrun',
 } as const;
 
 export const EVENT = {
@@ -51,6 +53,8 @@ export const EVENT = {
   flagCreated: 'flag.created',
   flagRolloutChanged: 'flag.rollout_changed',
   flagEvaluated: 'flag.evaluated',
+  testSuiteCreated: 'testsuite.created',
+  testRunRecorded: 'testrun.recorded',
 } as const;
 
 export function newId(prefix: string): string {

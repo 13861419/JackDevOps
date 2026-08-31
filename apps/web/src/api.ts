@@ -84,6 +84,7 @@ export interface DomainEventView {
   eventId: string;
   traceId: string;
   type: string;
+  aggregateType: string;
   aggregateId: string;
   actor: { type: string; id: string };
   payload: Record<string, unknown>;

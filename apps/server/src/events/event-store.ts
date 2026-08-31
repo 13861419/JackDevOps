@@ -5,6 +5,7 @@ export interface EventStore {
   listByTrace(traceId: string): Promise<DomainEvent[]>;
   listByAggregate(aggregateType: string, aggregateId: string): Promise<DomainEvent[]>;
   listByType(type: string): Promise<DomainEvent[]>;
+  listAll(limit?: number, offset?: number): Promise<DomainEvent[]>;
 }
 
 export class InMemoryEventStore implements EventStore {
@@ -26,5 +27,11 @@ export class InMemoryEventStore implements EventStore {
 
   listByType(type: string): Promise<DomainEvent[]> {
     return Promise.resolve(this.events.filter((e) => e.type === type));
+  }
+
+  async listAll(limit = 100, offset = 0): Promise<DomainEvent[]> {
+    const start = Math.max(0, this.events.length - offset);
+    const end = Math.max(0, start - limit);
+    return Promise.resolve(this.events.slice(end, start).reverse());
   }
 }

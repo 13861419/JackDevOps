@@ -135,6 +135,26 @@ export function RunDetail({ id }: { id: string }) {
           ))}
         </tbody>
       </table>
+      <h2>Job 输出（F4）</h2>
+      {trace
+        .filter((e) => e.type === 'job.succeeded' || e.type === 'job.failed')
+        .map((e) => {
+          const result = e.payload.result as { stdout?: string; stderr?: string } | undefined;
+          const output =
+            e.type === 'job.succeeded'
+              ? (result?.stdout ?? result?.stderr ?? '')
+              : String(e.payload.error ?? '');
+          return (
+            <div className="card" key={e.eventId}>
+              <strong className={e.type === 'job.failed' ? 'chip failed' : 'chip succeeded'}>
+                {String(e.payload.jobId)}
+              </strong>
+              <pre className="mono" style={{ whiteSpace: 'pre-wrap', margin: '8px 0 0' }}>
+                {output || '(无输出)'}
+              </pre>
+            </div>
+          );
+        })}
       <h2>变更指纹 · 事件链</h2>
       <p className="muted mono">traceId: {run.traceId}</p>
       <ul className="timeline">
