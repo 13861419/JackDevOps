@@ -26,10 +26,11 @@
 # 1. 安装依赖（需要 Node 22+ 与 pnpm 11+）
 pnpm install
 
-# 2. 启动本地基础设施（PostgreSQL + Redis）
+# 2. 启动本地基础设施（PostgreSQL + Redis，宿主端口 5433/6380 避免冲突）
 docker compose -f deploy/docker-compose.yml up -d
 
-# 3. 启动开发服务
+# 3. 启动开发服务（未设置 DATABASE_URL 时自动降级为内存事件存储）
+$env:DATABASE_URL = "postgresql://jackdevops:jackdevops@localhost:5433/jackdevops"
 pnpm dev
 # API:      http://localhost:3000/health
 # Web:      http://localhost:5173
