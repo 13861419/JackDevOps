@@ -9,6 +9,7 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { NotifyModule } from './modules/notify/notify.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { ReviewModule } from './modules/review/review.module';
+import { AiModule } from './modules/ai/ai.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { ReviewModule } from './modules/review/review.module';
     WebhooksModule,
     OnboardingModule,
     ReviewModule,
+    AiModule,
   ],
 })
 export class AppModule {}

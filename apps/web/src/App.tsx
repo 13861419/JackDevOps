@@ -6,6 +6,7 @@ import Workflows from './pages/Workflows';
 import { Runs, RunDetail } from './pages/Runs';
 import Onboarding from './pages/Onboarding';
 import CommandPalette from './components/CommandPalette';
+import AiSidebar from './components/AiSidebar';
 
 const NAV = [
   { hash: '#/', label: '工作台' },
@@ -29,6 +30,7 @@ function useHashRoute(): string {
 export default function App() {
   const route = useHashRoute();
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -59,7 +61,11 @@ export default function App() {
         </div>
       </nav>
       <main className="content">{renderRoute(route)}</main>
+      <button className="ai-fab" onClick={() => setAiOpen(true)}>
+        AI
+      </button>
       {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
+      {aiOpen && <AiSidebar onClose={() => setAiOpen(false)} />}
     </div>
   );
 }

@@ -1,9 +1,16 @@
 const BASE = '/api';
 
+export function getToken(): string {
+  return localStorage.getItem('jack_token') ?? 'dev-admin-token';
+}
+
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers: body === undefined ? undefined : { 'content-type': 'application/json' },
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${getToken()}`,
+    },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!res.ok) {

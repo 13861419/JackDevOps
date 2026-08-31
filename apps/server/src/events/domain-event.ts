@@ -24,6 +24,7 @@ export const AGGREGATE = {
   workflowRun: 'workflowrun',
   template: 'template',
   review: 'review',
+  ai: 'ai',
 } as const;
 
 export const EVENT = {
@@ -39,6 +40,7 @@ export const EVENT = {
   jobFailed: 'job.failed',
   jobSkipped: 'job.skipped',
   reviewCompleted: 'review.completed',
+  aiCompleted: 'ai.completed',
 } as const;
 
 export function newId(prefix: string): string {

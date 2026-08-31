@@ -49,11 +49,37 @@ export function RunDetail({ id }: { id: string }) {
   const [run, setRun] = useState<Run | null>(null);
   const [trace, setTrace] = useState<DomainEventView[]>([]);
   const [error, setError] = useState('');
+  const [aiBusy, setAiBusy] = useState('');
+  const [aiResult, setAiResult] = useState<{ title: string; text: string } | null>(null);
+
+  const loadTrace = (): void => {
+    api.get<DomainEventView[]>(`/runs/${id}/trace`).then(setTrace).catch(() => undefined);
+  };
 
   useEffect(() => {
     api.get<Run>(`/runs/${id}`).then(setRun).catch((e) => setError(String(e)));
-    api.get<DomainEventView[]>(`/runs/${id}/trace`).then(setTrace).catch(() => undefined);
+    loadTrace();
   }, [id]);
+
+  const askAi = async (kind: 'risk-summary' | 'diagnose'): Promise<void> => {
+    setAiBusy(kind);
+    setError('');
+    setAiResult(null);
+    try {
+      if (kind === 'risk-summary') {
+        const res = await api.post<{ summary: string }>(`/ai/risk-summary/${id}`, { actorId: 'web' });
+        setAiResult({ title: 'AI 风险摘要', text: res.summary });
+      } else {
+        const res = await api.post<{ diagnosis: string }>(`/ai/diagnose/${id}`, { actorId: 'web' });
+        setAiResult({ title: 'AI 诊断', text: res.diagnosis });
+      }
+      loadTrace();
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setAiBusy('');
+    }
+  };
 
   if (error) {
     return <p className="chip failed">{error}</p>;
@@ -65,30 +91,57 @@ export function RunDetail({ id }: { id: string }) {
   return (
     <div>
       <h1>
-        运行 <span className="mono">{id}</span> <span className={`chip ${run.status}`}>{STATUS_LABELS[run.status] ?? run.status}</span>
+        运行 <span className="mono">{id}</span>{' '}
+        <span className={`chip ${run.status}`}>{STATUS_LABELS[run.status] ?? run.status}</span>
       </h1>
       <div className="card">
-        <h2>Job 状态</h2>
-        <table>
-          <tbody>
-            {(run.jobs ?? []).map((j) => (
-              <tr key={j.id}>
-                <td>{j.id}</td>
-                <td>{j.type}</td>
-                <td>
-                  <span className={`chip ${j.status}`}>{STATUS_LABELS[j.status] ?? j.status}</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <h2>AI Copilot（上下文注入自事件链）</h2>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            disabled={aiBusy !== ''}
+            onClick={() => {
+              void askAi('risk-summary');
+            }}
+          >
+            {aiBusy === 'risk-summary' ? '生成中…' : 'AI 风险摘要'}
+          </button>
+          <button
+            disabled={aiBusy !== ''}
+            onClick={() => {
+              void askAi('diagnose');
+            }}
+          >
+            {aiBusy === 'diagnose' ? '分析中…' : 'AI 诊断'}
+          </button>
+        </div>
+        {aiResult && (
+          <div className="card" style={{ marginTop: 10, whiteSpace: 'pre-wrap' }}>
+            <strong>{aiResult.title}</strong>
+            <p style={{ marginBottom: 0 }}>{aiResult.text}</p>
+          </div>
+        )}
       </div>
+      <h2>Job 状态</h2>
+      <table>
+        <tbody>
+          {(run.jobs ?? []).map((j) => (
+            <tr key={j.id}>
+              <td>{j.id}</td>
+              <td>{j.type}</td>
+              <td>
+                <span className={`chip ${j.status}`}>{STATUS_LABELS[j.status] ?? j.status}</span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
       <h2>变更指纹 · 事件链</h2>
       <p className="muted mono">traceId: {run.traceId}</p>
       <ul className="timeline">
         {trace.map((e) => (
           <li key={e.eventId}>
-            <strong>{e.type}</strong> · {e.actor.type}:{e.actor.id} · {new Date(e.occurredAt).toLocaleTimeString()}
+            <strong>{e.type}</strong> · {e.actor.type}:{e.actor.id} ·{' '}
+            {new Date(e.occurredAt).toLocaleTimeString()}
           </li>
         ))}
       </ul>

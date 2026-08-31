@@ -1,0 +1,17 @@
+{
+  "name": "@jackdevops/agent-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Stable agent runtime boundary: multi-model LLM access with dsh-compatible seam",
+  "license": "Apache-2.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}
