@@ -1,10 +1,19 @@
 import { useEffect, useState } from 'react';
 import { api, type Run, type ServiceView, type Workflow, STATUS_LABELS } from '../api';
 
+interface Dora {
+  windowDays: number;
+  deployments: number;
+  deploymentFrequencyPerDay: number;
+  changeFailureRate: number | null;
+  mttrMinutes: number | null;
+}
+
 export default function Dashboard() {
   const [services, setServices] = useState<ServiceView[]>([]);
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [runs, setRuns] = useState<Run[]>([]);
+  const [dora, setDora] = useState<Dora | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -15,6 +24,7 @@ export default function Dashboard() {
         setRuns(r);
       })
       .catch((e) => setError(String(e)));
+    api.get<Dora>('/metrics/dora').then(setDora).catch(() => undefined);
   }, []);
 
   return (
@@ -34,6 +44,16 @@ export default function Dashboard() {
           <p>服务：{services.length}</p>
           <p>流水线：{workflows.length}</p>
           <p>运行记录：{runs.length}</p>
+        </div>
+        <div className="card">
+          <h2>DORA（近 {dora?.windowDays ?? 30} 天）</h2>
+          <p className="muted" style={{ margin: '4px 0' }}>部署 {dora?.deployments ?? 0} 次 · 频率 {dora?.deploymentFrequencyPerDay ?? 0}/天</p>
+          <p className="muted" style={{ margin: '4px 0' }}>
+            变更失败率: {dora?.changeFailureRate == null ? '-' : `${(dora.changeFailureRate * 100).toFixed(1)}%`}
+          </p>
+          <p className="muted" style={{ margin: '4px 0' }}>
+            MTTR: {dora?.mttrMinutes == null ? '-' : `${dora.mttrMinutes} 分钟`}
+          </p>
         </div>
       </div>
       <h2>最近运行</h2>

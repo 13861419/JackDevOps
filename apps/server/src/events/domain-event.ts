@@ -25,6 +25,8 @@ export const AGGREGATE = {
   template: 'template',
   review: 'review',
   ai: 'ai',
+  release: 'release',
+  flag: 'flag',
 } as const;
 
 export const EVENT = {
@@ -41,6 +43,13 @@ export const EVENT = {
   jobSkipped: 'job.skipped',
   reviewCompleted: 'review.completed',
   aiCompleted: 'ai.completed',
+  releaseRegistered: 'release.registered',
+  releaseStrategyStep: 'release.strategy_step',
+  releasePromoted: 'release.promoted',
+  releaseRolledBack: 'release.rolled_back',
+  flagCreated: 'flag.created',
+  flagRolloutChanged: 'flag.rollout_changed',
+  flagEvaluated: 'flag.evaluated',
 } as const;
 
 export function newId(prefix: string): string {
