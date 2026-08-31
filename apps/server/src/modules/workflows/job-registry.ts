@@ -1,5 +1,52 @@
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import type { JobHandler, JobType } from './workflow.types';
+
+const execAsync = promisify(exec);
+const OUTPUT_LIMIT = 8192;
+const DEFAULT_TIMEOUT_MS = 600_000;
+
+function clip(text: string | undefined, limit = OUTPUT_LIMIT): string {
+  if (!text) {
+    return '';
+  }
+  return text.length <= limit ? text : `${text.slice(0, limit)}...[truncated ${text.length - limit} chars]`;
+}
+
+type ShellResult = {
+  ok: true;
+  type: JobType;
+  executed: boolean;
+  durationMs: number;
+  stdout?: string;
+  stderr?: string;
+};
+
+async function runShell(
+  type: JobType,
+  command: string,
+  config: Record<string, unknown>,
+): Promise<ShellResult> {
+  const started = Date.now();
+  const timeoutMs = Number(config.timeoutMs) || DEFAULT_TIMEOUT_MS;
+  const cwd = typeof config.cwd === 'string' ? config.cwd : undefined;
+  try {
+    const res = await execAsync(command, { timeout: timeoutMs, cwd, windowsHide: true });
+    return {
+      ok: true,
+      type,
+      executed: true,
+      durationMs: Date.now() - started,
+      stdout: clip(res.stdout),
+      stderr: clip(res.stderr),
+    };
+  } catch (err) {
+    const e = err as { code?: number | string; stdout?: string; stderr?: string; message?: string };
+    const tail = clip(e.stderr || e.stdout, 500);
+    throw new Error(`command failed (code ${e.code ?? '?'}): ${tail || e.message}`);
+  }
+}
 
 @Injectable()
 export class JobRegistry {
@@ -32,20 +79,49 @@ export class JobRegistry {
   }
 }
 
-function stub(type: JobType, description: string): JobHandler {
+function shellBuiltin(type: JobType, description: string): JobHandler {
   return {
     type,
     description,
-    run: async () => ({ ok: true, type }),
+    run: async (ctx) => {
+      const command = typeof ctx.config.command === 'string' ? ctx.config.command : '';
+      if (!command) {
+        return { ok: true, type, executed: false, durationMs: 0, note: 'no command configured; stub pass' };
+      }
+      return runShell(type, command, ctx.config);
+    },
   };
+}
+
+export async function hasBinary(binary: string): Promise<boolean> {
+  try {
+    await execAsync(`${binary} --version`, { timeout: 10_000, windowsHide: true });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function builtinHandlers(): JobHandler[] {
   return [
-    stub('scan', 'Trivy image scan gate (stub until M3)'),
-    stub('build', 'Build artifact (stub until M3)'),
-    stub('test', 'Run test suites (stub until M3)'),
-    stub('deploy', 'Deploy to environment (stub until M3)'),
+    {
+      type: 'scan',
+      description: 'Trivy image/fs scan gate; falls back to config.command, then stub pass',
+      run: async (ctx) => {
+        if (ctx.config.trivy === true) {
+          const target = typeof ctx.config.path === 'string' ? ctx.config.path : '.';
+          const available = await hasBinary('trivy');
+          if (!available) {
+            throw new Error('trivy binary not found on PATH (C3 gate is fail-closed)');
+          }
+          return runShell('scan', `trivy fs --quiet ${JSON.stringify(target)}`, ctx.config);
+        }
+        return shellBuiltin('scan', 'scan gate').run(ctx);
+      },
+    },
+    shellBuiltin('build', 'Build artifact'),
+    shellBuiltin('test', 'Run test suites'),
+    shellBuiltin('deploy', 'Deploy to environment'),
     {
       type: 'agent',
       description: 'AI agent session via dsh (activates in Phase 2)',

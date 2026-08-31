@@ -4,8 +4,9 @@ import { WorkItemsModule } from './modules/workitems/workitems.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { WorkflowsModule } from './modules/workflows/workflows.module';
 import { TemplatesModule } from './modules/templates/templates.module';
+import { WebhooksModule } from './modules/webhooks/webhooks.module';
 
 @Module({
-  imports: [EventsModule, WorkItemsModule, CatalogModule, WorkflowsModule, TemplatesModule],
+  imports: [EventsModule, WorkItemsModule, CatalogModule, WorkflowsModule, TemplatesModule, WebhooksModule],
 })
 export class AppModule {}

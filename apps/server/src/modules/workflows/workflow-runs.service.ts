@@ -2,7 +2,7 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { AGGREGATE, EVENT, makeEvent, newId } from '../../events';
 import { EVENT_STORE, type EventStore, type DomainEvent } from '../../events';
 import { JobRegistry } from './job-registry';
-import type { JobSpec, JobStatus, RunStatus } from './workflow.types';
+import type { JobSpec, JobStatus, RunMeta, RunStatus } from './workflow.types';
 
 export interface RunJobView {
   id: string;
@@ -16,6 +16,7 @@ export interface RunView {
   traceId: string;
   status: RunStatus;
   jobs: RunJobView[];
+  meta?: RunMeta;
   startedAt: string;
   finishedAt?: string;
 }
@@ -29,7 +30,7 @@ export class WorkflowRunsService {
     private readonly jobRegistry: JobRegistry,
   ) {}
 
-  async startRun(workflowId: string, actorId: string): Promise<RunView> {
+  async startRun(workflowId: string, actorId: string, meta?: RunMeta): Promise<RunView> {
     const workflow = await this.eventStore
       .listByAggregate(AGGREGATE.workflow, workflowId)
       .then((events) => events.find((e) => e.type === EVENT.workflowCreated));
@@ -44,12 +45,15 @@ export class WorkflowRunsService {
       traceId: workflow.traceId,
       status: 'running',
       jobs: spec.jobs.map((j) => ({ id: j.id, type: j.type, status: 'pending' as JobStatus })),
+      meta,
       startedAt: new Date().toISOString(),
     };
     this.runs.set(runId, view);
     await this.emit(view.traceId, EVENT.runStarted, runId, {
       workflowId,
       jobIds: spec.jobs.map((j) => j.id),
+      meta: meta ?? null,
+      triggeredBy: actorId,
     });
     void this.execute(spec.jobs, view).catch(() => undefined);
     return view;
