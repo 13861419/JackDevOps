@@ -1,0 +1,21 @@
+# dependencies
+node_modules/
+
+# build outputs
+dist/
+build/
+.turbo/
+
+# env & secrets
+.env
+.env.*
+!.env.example
+
+# logs & coverage
+logs/
+*.log
+coverage/
+
+# os
+.DS_Store
+Thumbs.db

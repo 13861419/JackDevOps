@@ -1,0 +1,67 @@
+# JackDevOps 路线图（Roadmap）
+
+> 功能 ID 见 `feature-inventory.md`。每阶段交付前执行"新人 10 分钟测试"门禁。
+
+---
+
+## Phase 0 —— 项目奠基（本次交付 ✅）
+
+- [x] 文档五件套：feature-inventory / PRD / competitive-analysis / architecture / roadmap
+- [x] Monorepo 脚手架：apps/server（NestJS）+ apps/web（Vite React）+ docker-compose + CI
+- [ ] 设计评审：事件溯源 schema（F1）与服务目录领域模型（A2）为最高优先级评审项
+
+## Phase 1 —— CI/CD 核心闭环 + 上手快基石
+
+**主题**：跑通最小闭环，埋下两大差异化地基。
+
+| 功能 | ID | 说明 |
+|---|---|---|
+| 事件溯源 + 变更指纹 | F1 | 全链路 traceId，**第一优先级** |
+| 需求/工作项管理 | A1 | 状态流转事件化 |
+| 服务目录（轻量版） | A2 | 领域模型轴心 |
+| 角色化工作台 | A3 | 四角色首页 |
+| Git 深度集成 | B1 | PR 驱动、状态回写 |
+| PR 规则评审 | B2 | 规则版 |
+| CLI + API-first | B5 | 同源 API |
+| Trivy 扫描门禁 | C3 | 流水线默认步骤 |
+| 工作流引擎 | D1 | DAG + Job 插件协议（预留 agent 类型） |
+| 模板库 | D2 | 构建/部署/流水线模板 |
+| 环境管理 | D3 | 面向服务的环境 |
+| Onboarding Wizard | D7 | 10 分钟闭环向导 |
+| IM 通知 | A4 | 钉钉/企微/飞书/Slack webhook |
+| RBAC 基础 + OIDC | F2 | 权限模型 |
+| 双形态交付 + Demo 模式 | F10 | Helm + Compose |
+| ⌘K 命令面板 | F11 | 全局跳转 |
+
+**验收**：新人 10 分钟跑通首条流水线；任何构建/部署可回溯到需求与 PR；Trivy 不可绕过。
+
+## Phase 2 —— 发布治理 + AI 落地
+
+**主题**：渐进式交付 + dsh 融合，AI 从"点状"到"流程参与者"。
+
+- Web 调试三件套（F4）、DORA 看板（F6）、审计日志（F3）
+- 渐进式交付（D4）、高并发构建（D6）、PR Preview 环境（D8）
+- 测试管理 + 质量门禁（C1/C2）、智能测试选择规则版（C4）、失败自动归因（C5）
+- **dsh 融合**：agent-gateway + 契约测试 + LLM 多模型（E1/E2）、AI 侧边栏（E3）、AI 风险摘要审批卡（E4）、上下文 AI 诊断（E5）
+- IM 审批卡片完整版（A4）、自动 Release Notes 规则版（A5）
+
+**验收**：审批人可看到 AI 风险摘要；发布失败 AI 诊断携带全链路上文；DORA 四指标自动产出。
+
+## Phase 3 —— 平台工程深化
+
+**主题**：IDP 能力与治理闭环。
+
+- 黄金路径脚手架（B3）、TechDocs（B4）
+- 配置漂移检测与 reconcile（F7）、关联物回滚（D5，DB 迁移仅提示）
+- 目录问答 Agent（E6）、Lead Time 自动化（A5 完整版）
+- External Secrets（F8）、多租户（F2）、SLSA/FinOps（F9 候选）、插件市场
+
+**验收**：差异化承诺全部兑现（PRD §2 七大痛点闭环）。
+
+---
+
+## 里程碑原则
+
+1. **F1 事件流是第一优先级**：任何阶段牺牲功能不牺牲事件流完整性
+2. **AI 不提前**：Phase 1 不引 dsh 依赖，但 Job 协议预留
+3. **每阶段以"新人 10 分钟测试"收口**：易用性是产品核心，不是附加项
