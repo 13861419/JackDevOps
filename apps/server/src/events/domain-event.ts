@@ -20,12 +20,23 @@ export interface DomainEvent<T = Record<string, unknown>> {
 export const AGGREGATE = {
   workItem: 'workitem',
   service: 'service',
+  workflow: 'workflow',
+  workflowRun: 'workflowrun',
+  template: 'template',
 } as const;
 
 export const EVENT = {
   workItemCreated: 'workitem.created',
   workItemStatusChanged: 'workitem.status_changed',
   serviceRegistered: 'service.registered',
+  workflowCreated: 'workflow.created',
+  templateRegistered: 'template.registered',
+  runStarted: 'run.started',
+  runCompleted: 'run.completed',
+  jobStarted: 'job.started',
+  jobSucceeded: 'job.succeeded',
+  jobFailed: 'job.failed',
+  jobSkipped: 'job.skipped',
 } as const;
 
 export function newId(prefix: string): string {
