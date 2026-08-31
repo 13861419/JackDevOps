@@ -8,5 +8,6 @@ import { WorkflowsModule } from '../workflows/workflows.module';
   imports: [WorkflowsModule],
   controllers: [AiController],
   providers: [AiService, LlmService],
+  exports: [LlmService],
 })
 export class AiModule {}

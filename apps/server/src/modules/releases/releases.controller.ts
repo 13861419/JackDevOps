@@ -16,8 +16,15 @@ const rollbackDto = z.object({
   actorId: z.string().min(1).default('web'),
 });
 
+const approveDto = z.object({
+  decision: z.enum(['approved', 'rejected']),
+  aiSummary: z.string().max(2000).optional(),
+  actorId: z.string().min(1).default('web'),
+});
+
 type RegisterReleaseDto = z.infer<typeof registerReleaseDto>;
 type RollbackDto = z.infer<typeof rollbackDto>;
+type ApproveDto = z.infer<typeof approveDto>;
 
 @Controller('releases')
 export class ReleasesController {
@@ -36,6 +43,16 @@ export class ReleasesController {
   @Get(':id')
   get(@Param('id') id: string) {
     return this.releases.get(id);
+  }
+
+  @Get(':id/notes')
+  notes(@Param('id') id: string) {
+    return this.releases.notes(id);
+  }
+
+  @Post(':id/approve')
+  approve(@Param('id') id: string, @Body(new ZodValidationPipe(approveDto)) dto: ApproveDto) {
+    return this.releases.approve(id, dto);
   }
 
   @Post(':id/promote')

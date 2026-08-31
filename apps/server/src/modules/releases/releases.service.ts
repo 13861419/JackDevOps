@@ -1,7 +1,15 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { AGGREGATE, EVENT, makeEvent, newId } from '../../events';
 import { EVENT_STORE, type EventStore, type DomainEvent } from '../../events';
+import { LlmService } from '../ai/llm.service';
 import { defaultSteps, type ReleaseStep, type ReleaseStrategyType } from './release.types';
+
+export interface ReleaseApproval {
+  decision: 'approved' | 'rejected';
+  aiSummary?: string;
+  actorId: string;
+  at: string;
+}
 
 export interface ReleaseView {
   id: string;
@@ -11,6 +19,7 @@ export interface ReleaseView {
   artifacts: string[];
   strategy: ReleaseStrategyType;
   steps: ReleaseStep[];
+  approvals: ReleaseApproval[];
   status: 'in_progress' | 'promoted' | 'rolled_back';
   reason?: string;
   createdAt: string;
@@ -23,6 +32,7 @@ interface ReleaseAggregate {
   artifacts: string[];
   strategy: ReleaseStrategyType;
   steps: ReleaseStep[];
+  approvals: ReleaseApproval[];
   status: 'in_progress' | 'promoted' | 'rolled_back';
   reason?: string;
   createdAt: string;
@@ -30,7 +40,10 @@ interface ReleaseAggregate {
 
 @Injectable()
 export class ReleasesService {
-  constructor(@Inject(EVENT_STORE) private readonly eventStore: EventStore) {}
+  constructor(
+    @Inject(EVENT_STORE) private readonly eventStore: EventStore,
+    @Optional() private readonly llm?: LlmService,
+  ) {}
 
   async register(input: {
     runId: string;
@@ -79,6 +92,31 @@ export class ReleasesService {
     return view;
   }
 
+  async approve(
+    id: string,
+    input: { decision: 'approved' | 'rejected'; aiSummary?: string; actorId: string },
+  ): Promise<ReleaseView> {
+    const aggregate = await this.load(id);
+    if (!aggregate) {
+      throw new NotFoundException(`release ${id} not found`);
+    }
+    if (aggregate.status !== 'in_progress') {
+      throw new ConflictException(`release ${id} is ${aggregate.status}, cannot review`);
+    }
+    await this.eventStore.append(
+      makeEvent({
+        traceId: aggregate.traceId,
+        type: EVENT.releaseApproved,
+        aggregateType: AGGREGATE.release,
+        aggregateId: id,
+        actor: { type: 'user', id: input.actorId },
+        payload: { decision: input.decision, aiSummary: input.aiSummary ?? null },
+      }),
+    );
+    const view = await this.project(id);
+    return view as ReleaseView;
+  }
+
   async promote(id: string, actorId: string): Promise<ReleaseView> {
     const aggregate = await this.load(id);
     if (!aggregate) {
@@ -86,6 +124,11 @@ export class ReleasesService {
     }
     if (aggregate.status !== 'in_progress') {
       throw new ConflictException(`release ${id} is ${aggregate.status}, cannot promote`);
+    }
+    if (aggregate.strategy !== 'rolling' && !aggregate.approvals.some((a) => a.decision === 'approved')) {
+      throw new ConflictException(
+        `release ${id} requires an approval before promotion (strategy: ${aggregate.strategy})`,
+      );
     }
     for (const step of aggregate.steps) {
       if (step.status === 'pending') {
@@ -135,6 +178,34 @@ export class ReleasesService {
     return view as ReleaseView;
   }
 
+  async notes(id: string): Promise<{ notes: string; generatedBy: 'rules' | 'ai' }> {
+    const aggregate = await this.load(id);
+    if (!aggregate) {
+      throw new NotFoundException(`release ${id} not found`);
+    }
+    const rulesNotes = [
+      `# Release ${aggregate.version}`,
+      `- 状态: ${aggregate.status}`,
+      `- 策略: ${aggregate.strategy}`,
+      `- 关联物: ${aggregate.artifacts.length ? aggregate.artifacts.join(', ') : '无'}`,
+      `- 审批: ${aggregate.approvals.length ? aggregate.approvals.map((a) => `${a.decision} by ${a.actorId}`).join('; ') : '待审批'}`,
+      `- 步骤: ${aggregate.steps.map((s) => `${s.weight}%(${s.status})`).join(' -> ')}`,
+    ].join('\n');
+
+    if (this.llm?.available) {
+      try {
+        const res = await this.llm.chat([
+          { role: 'system', content: '你是发布经理助手，把结构化发布信息润色成一段给干系人的中文 Release Notes。' },
+          { role: 'user', content: rulesNotes },
+        ]);
+        return { notes: res.answer, generatedBy: 'ai' };
+      } catch {
+        return { notes: rulesNotes, generatedBy: 'rules' };
+      }
+    }
+    return { notes: rulesNotes, generatedBy: 'rules' };
+  }
+
   async get(id: string): Promise<ReleaseView | null> {
     return this.project(id);
   }
@@ -162,6 +233,7 @@ export class ReleasesService {
           steps: ((event.payload.steps as { weight: number; status: 'pending' }[]) ?? []).map(
             (s, index) => ({ index, weight: s.weight, status: 'pending' as const }),
           ),
+          approvals: [],
           status: 'in_progress',
           createdAt: event.occurredAt,
         };
@@ -175,6 +247,13 @@ export class ReleasesService {
       } else if (event.type === EVENT.releaseRolledBack && aggregate) {
         aggregate.status = 'rolled_back';
         aggregate.reason = event.payload.reason as string;
+      } else if (event.type === EVENT.releaseApproved && aggregate) {
+        aggregate.approvals.push({
+          decision: event.payload.decision as 'approved' | 'rejected',
+          aiSummary: (event.payload.aiSummary as string | null) ?? undefined,
+          actorId: event.actor.id,
+          at: event.occurredAt,
+        });
       }
     }
     return aggregate;
@@ -193,9 +272,12 @@ export class ReleasesService {
       artifacts: aggregate.artifacts,
       strategy: aggregate.strategy,
       steps: aggregate.steps,
+      approvals: aggregate.approvals,
       status: aggregate.status,
       reason: aggregate.reason,
       createdAt: aggregate.createdAt,
     };
   }
 }
+
+export type { DomainEvent };

@@ -30,7 +30,7 @@ describe('releases (D4 progressive delivery)', () => {
   const runs = new WorkflowRunsService(store, registry);
   const releases = new ReleasesService(store);
 
-  it('registers a release inheriting the run change fingerprint, promotes via canary steps', async () => {
+  it('registers a release inheriting the run change fingerprint, promotes via canary steps after approval', async () => {
     const wf = await workflows.create({
       name: 'release-flow',
       spec: { jobs: [{ id: 'build', type: 'build' }] },
@@ -50,15 +50,39 @@ describe('releases (D4 progressive delivery)', () => {
     expect(release.status).toBe('in_progress');
     expect(release.steps.map((s) => s.weight)).toEqual([10, 50, 100]);
 
+    await expect(releases.promote(release.id, 'ops')).rejects.toThrow(/requires an approval/);
+
+    await releases.approve(release.id, { decision: 'approved', aiSummary: '风险低，放行', actorId: 'approver' });
     const promoted = await releases.promote(release.id, 'ops');
     expect(promoted.status).toBe('promoted');
     expect(promoted.steps.every((s) => s.status === 'succeeded')).toBe(true);
+    expect(promoted.approvals[0].aiSummary).toBe('风险低，放行');
 
     const trace = await store.listByTrace(run.traceId);
     const types = trace.map((e) => e.type);
     expect(types).toContain(EVENT.releaseRegistered);
+    expect(types).toContain(EVENT.releaseApproved);
     expect(types).toContain(EVENT.releaseStrategyStep);
     expect(types).toContain(EVENT.releasePromoted);
+  });
+
+  it('rejecting an approval keeps the release blocked', async () => {
+    const wf = await workflows.create({
+      name: 'reject-flow',
+      spec: { jobs: [{ id: 'build', type: 'build' }] },
+      actorId: 'u1',
+    });
+    const run = await runs.startRun(wf.id, 'u1');
+    await waitForRun(runs, run.id);
+    const release = await releases.register({
+      runId: run.id,
+      version: `v-reject-${Date.now()}`,
+      artifacts: [],
+      strategy: 'canary',
+      actorId: 'ops',
+    });
+    await releases.approve(release.id, { decision: 'rejected', actorId: 'approver' });
+    await expect(releases.promote(release.id, 'ops')).rejects.toThrow(/requires an approval/);
   });
 
   it('rolls back a release with reason', async () => {

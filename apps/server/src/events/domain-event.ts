@@ -47,6 +47,7 @@ export const EVENT = {
   releaseStrategyStep: 'release.strategy_step',
   releasePromoted: 'release.promoted',
   releaseRolledBack: 'release.rolled_back',
+  releaseApproved: 'release.approved',
   flagCreated: 'flag.created',
   flagRolloutChanged: 'flag.rollout_changed',
   flagEvaluated: 'flag.evaluated',

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: jackdevops
+description: AI-ready, full-lifecycle DevOps platform (requirement to operations)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
