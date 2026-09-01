@@ -39,4 +39,9 @@ export class AiController {
   ) {
     return this.ai.diagnose(runId, dto.actorId);
   }
+
+  @Post('catalog-qa')
+  catalogQa(@Body(new ZodValidationPipe(chatDto)) dto: { question: string; actorId: string }) {
+    return this.ai.catalogQa(dto.question, dto.actorId);
+  }
 }

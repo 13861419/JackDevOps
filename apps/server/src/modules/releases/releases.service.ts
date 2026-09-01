@@ -22,6 +22,8 @@ export interface ReleaseView {
   approvals: ReleaseApproval[];
   status: 'in_progress' | 'promoted' | 'rolled_back';
   reason?: string;
+  redeployedFrom?: string;
+  redeployedAt?: string;
   createdAt: string;
 }
 
@@ -35,6 +37,8 @@ interface ReleaseAggregate {
   approvals: ReleaseApproval[];
   status: 'in_progress' | 'promoted' | 'rolled_back';
   reason?: string;
+  redeployedFrom?: string;
+  redeployedAt?: string;
   createdAt: string;
 }
 
@@ -174,8 +178,29 @@ export class ReleasesService {
         payload: { reason, artifacts: aggregate.artifacts },
       }),
     );
+    const target = await this.findLastPromoted(id);
+    if (target) {
+      await this.eventStore.append(
+        makeEvent({
+          traceId: target.traceId,
+          type: EVENT.releaseRedeployed,
+          aggregateType: AGGREGATE.release,
+          aggregateId: target.id,
+          actor: { type: 'user', id: actorId },
+          payload: { fromReleaseId: id, reason, artifacts: target.artifacts },
+        }),
+      );
+    }
     const view = await this.project(id);
     return view as ReleaseView;
+  }
+
+  private async findLastPromoted(excludeId: string): Promise<ReleaseView | null> {
+    const all = await this.list();
+    const promoted = all
+      .filter((r) => r.id !== excludeId && r.status === 'promoted')
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    return promoted[0] ?? null;
   }
 
   async notes(id: string): Promise<{ notes: string; generatedBy: 'rules' | 'ai' }> {
@@ -247,6 +272,9 @@ export class ReleasesService {
       } else if (event.type === EVENT.releaseRolledBack && aggregate) {
         aggregate.status = 'rolled_back';
         aggregate.reason = event.payload.reason as string;
+      } else if (event.type === EVENT.releaseRedeployed && aggregate) {
+        aggregate.redeployedFrom = event.payload.fromReleaseId as string;
+        aggregate.redeployedAt = event.occurredAt;
       } else if (event.type === EVENT.releaseApproved && aggregate) {
         aggregate.approvals.push({
           decision: event.payload.decision as 'approved' | 'rejected',
@@ -275,6 +303,8 @@ export class ReleasesService {
       approvals: aggregate.approvals,
       status: aggregate.status,
       reason: aggregate.reason,
+      redeployedFrom: aggregate.redeployedFrom,
+      redeployedAt: aggregate.redeployedAt,
       createdAt: aggregate.createdAt,
     };
   }

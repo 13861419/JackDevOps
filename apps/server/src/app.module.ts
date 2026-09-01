@@ -16,6 +16,9 @@ import { MetricsModule } from './modules/metrics/metrics.module';
 import { TestsModule } from './modules/tests/tests.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { PreviewsModule } from './modules/previews/previews.module';
+import { ScaffoldModule } from './modules/scaffold/scaffold.module';
+import { DocsModule } from './modules/docs/docs.module';
+import { DriftModule } from './modules/drift/drift.module';
 
 @Module({
   imports: [
@@ -36,6 +39,9 @@ import { PreviewsModule } from './modules/previews/previews.module';
     TestsModule,
     AuditModule,
     PreviewsModule,
+    ScaffoldModule,
+    DocsModule,
+    DriftModule,
   ],
 })
 export class AppModule {}
