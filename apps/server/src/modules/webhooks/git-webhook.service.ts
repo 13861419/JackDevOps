@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { CatalogService } from '../catalog/catalog.service';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { WorkflowRunsService } from '../workflows/workflow-runs.service';
+import { PreviewsService } from '../previews/previews.service';
+import type { PreviewEnvView } from '../previews/preview.types';
 import type { RunMeta } from '../workflows/workflow.types';
 
 interface GitPushPayload {
@@ -11,6 +13,16 @@ interface GitPushPayload {
   branch?: string;
   repository?: { full_name?: string; html_url?: string };
   pusher?: { name?: string };
+}
+
+interface GitPrPayload {
+  action?: string;
+  number?: number;
+  pull_request?: {
+    number?: number;
+    title?: string;
+    head?: { ref?: string; sha?: string };
+  };
 }
 
 interface TriggeredRun {
@@ -25,6 +37,7 @@ export class GitWebhookService {
     private readonly catalog: CatalogService,
     private readonly workflows: WorkflowsService,
     private readonly runs: WorkflowRunsService,
+    private readonly previews: PreviewsService,
   ) {}
 
   async handlePush(slug: string, body: GitPushPayload): Promise<{ triggered: TriggeredRun[] }> {
@@ -41,6 +54,34 @@ export class GitWebhookService {
       triggered.push({ workflowId: wf.id, workflowName: wf.name, runId: run.id });
     }
     return { triggered };
+  }
+
+  async handlePullRequest(slug: string, body: GitPrPayload): Promise<{ preview?: PreviewEnvView; action: string }> {
+    const action = body.action ?? 'opened';
+    const prNumber = body.number ?? body.pull_request?.number;
+    if (!prNumber || prNumber < 1) {
+      throw new Error(`pull request payload missing number`);
+    }
+    const service = await this.catalog.get(slug);
+    if (!service) {
+      throw new Error(`service ${slug} not found`);
+    }
+    if (action === 'closed') {
+      const preview = await this.previews.destroyByPr(service.slug, prNumber);
+      return { action, preview: preview ?? undefined };
+    }
+    if (action !== 'opened' && action !== 'reopened') {
+      return { action };
+    }
+    const preview = await this.previews.request({
+      serviceId: service.slug,
+      prNumber,
+      prTitle: body.pull_request?.title,
+      branch: body.pull_request?.head?.ref,
+      commit: body.pull_request?.head?.sha,
+      actorId: 'webhook',
+    });
+    return { action, preview };
   }
 }
 

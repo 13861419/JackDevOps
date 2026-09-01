@@ -23,6 +23,7 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
 export const api = {
   get: <T = unknown>(path: string) => req<T>('GET', path),
   post: <T = unknown>(path: string, body?: unknown) => req<T>('POST', path, body),
+  del: <T = unknown>(path: string) => req<T>('DELETE', path),
 };
 
 export interface WorkItem {

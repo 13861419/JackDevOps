@@ -15,6 +15,7 @@ import { FlagsModule } from './modules/flags/flags.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
 import { TestsModule } from './modules/tests/tests.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { PreviewsModule } from './modules/previews/previews.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { AuditModule } from './modules/audit/audit.module';
     MetricsModule,
     TestsModule,
     AuditModule,
+    PreviewsModule,
   ],
 })
 export class AppModule {}

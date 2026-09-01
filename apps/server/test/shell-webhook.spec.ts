@@ -5,6 +5,7 @@ import { WorkflowsService } from '../src/modules/workflows/workflows.service';
 import { WorkflowRunsService } from '../src/modules/workflows/workflow-runs.service';
 import { CatalogService } from '../src/modules/catalog/catalog.service';
 import { GitWebhookService } from '../src/modules/webhooks/git-webhook.service';
+import { PreviewsService } from '../src/modules/previews/previews.service';
 import type { RunView } from '../src/modules/workflows/workflow.types';
 
 function waitForRun(runs: WorkflowRunsService, runId: string): Promise<RunView> {
@@ -78,7 +79,12 @@ describe('git webhook (B1)', () => {
   const catalog = new CatalogService(store);
   const workflows = new WorkflowsService(store, new JobRegistry());
   const runs = new WorkflowRunsService(store, new JobRegistry());
-  const webhook = new GitWebhookService(catalog, workflows, runs);
+  const webhook = new GitWebhookService(
+    catalog,
+    workflows,
+    runs,
+    new PreviewsService(store, catalog),
+  );
 
   it('triggers bound workflows with commit metadata on push', async () => {
     const service = await catalog.register({

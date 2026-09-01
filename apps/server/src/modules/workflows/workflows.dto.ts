@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const jobSpecDto = z.object({
   id: z.string().min(1).max(64),
-  type: z.enum(['build', 'test', 'scan', 'deploy', 'agent']),
+  type: z.enum(['build', 'test', 'scan', 'deploy', 'agent', 'container-build']),
   dependsOn: z.array(z.string().max(64)).max(32).optional(),
   config: z.record(z.string(), z.unknown()).optional(),
 });

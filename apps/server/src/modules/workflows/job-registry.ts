@@ -123,6 +123,40 @@ function builtinHandlers(): JobHandler[] {
     shellBuiltin('test', 'Run test suites'),
     shellBuiltin('deploy', 'Deploy to environment'),
     {
+      type: 'container-build',
+      description: 'Docker build (and optional push); gracefully skips when docker is unavailable',
+      run: async (ctx) => {
+        const image = typeof ctx.config.image === 'string' ? ctx.config.image : '';
+        if (!image) {
+          return { ok: true, type: 'container-build', executed: false, durationMs: 0, note: 'no image configured; stub pass' };
+        }
+        if (!(await hasBinary('docker'))) {
+          return {
+            ok: true,
+            type: 'container-build',
+            executed: false,
+            durationMs: 0,
+            note: `docker not available; would build ${image} (graceful skip)`,
+          };
+        }
+        const dockerfile = typeof ctx.config.dockerfile === 'string' ? ctx.config.dockerfile : 'Dockerfile';
+        const context = typeof ctx.config.context === 'string' ? ctx.config.context : '.';
+        const tag = typeof ctx.config.tag === 'string' ? ctx.config.tag : 'latest';
+        const started = Date.now();
+        await runShell('container-build', `docker build -f ${dockerfile} -t ${image}:${tag} ${context}`, ctx.config);
+        if (ctx.config.push === true) {
+          await runShell('container-build', `docker push ${image}:${tag}`, ctx.config);
+        }
+        return {
+          ok: true,
+          type: 'container-build',
+          executed: true,
+          durationMs: Date.now() - started,
+          stdout: `built ${image}:${tag}${ctx.config.push === true ? ' and pushed' : ''}`,
+        };
+      },
+    },
+    {
       type: 'agent',
       description: 'AI agent session via dsh (activates in Phase 2)',
       run: async () => {

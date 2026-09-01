@@ -29,6 +29,8 @@ export const AGGREGATE = {
   flag: 'flag',
   testSuite: 'testsuite',
   testRun: 'testrun',
+  previewEnv: 'previewenv',
+  doc: 'doc',
 } as const;
 
 export const EVENT = {
@@ -55,6 +57,14 @@ export const EVENT = {
   flagEvaluated: 'flag.evaluated',
   testSuiteCreated: 'testsuite.created',
   testRunRecorded: 'testrun.recorded',
+  previewEnvRequested: 'previewenv.requested',
+  previewEnvReady: 'previewenv.ready',
+  previewEnvDestroyed: 'previewenv.destroyed',
+  docUpdated: 'doc.updated',
+  driftDetected: 'drift.detected',
+  driftReconciled: 'drift.reconciled',
+  releaseRedeployed: 'release.redeployed',
+  scaffoldApplied: 'scaffold.applied',
 } as const;
 
 export function newId(prefix: string): string {
