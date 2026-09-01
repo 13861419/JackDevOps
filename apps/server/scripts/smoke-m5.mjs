@@ -29,6 +29,17 @@ if (opened.preview.status !== 'ready' || !opened.preview.url.includes(`preview-p
   throw new Error('preview env not ready with deterministic URL');
 }
 
+const deployed = await api('POST', `/previews/${opened.preview.id}/deploy`, {});
+console.log('2b) docker deploy:', deployed.deployed, deployed.url ?? deployed.note);
+if (deployed.deployed) {
+  const page = await fetch(deployed.url);
+  const body = await page.text();
+  if (!page.ok || !body.includes('preview')) throw new Error(`preview container not serving: ${page.status}`);
+  console.log('    real container up | container:', deployed.container);
+} else {
+  console.log('    docker unavailable, stub URL kept:', deployed.note);
+}
+
 const list = await api('GET', '/previews');
 const mine = list.find((p) => p.serviceId === slug && p.prNumber === prNumber);
 if (!mine) throw new Error('preview not listed');

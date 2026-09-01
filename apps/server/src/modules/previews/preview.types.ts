@@ -13,6 +13,9 @@ export interface PreviewEnvView {
   createdAt: string;
   destroyedAt?: string;
   ttlHours: number;
+  container?: string;
+  port?: number;
+  image?: string;
 }
 
 export function previewEnvName(prNumber: number): string {

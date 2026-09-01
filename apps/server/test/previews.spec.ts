@@ -89,6 +89,21 @@ describe('PR webhook lifecycle (D8)', () => {
   });
 });
 
+describe('preview deploy runner (D8 real provisioning)', () => {
+  it('degrades gracefully when docker is not available', async () => {
+    const store = new InMemoryEventStore();
+    const catalog = new CatalogService(store);
+    const previews = new PreviewsService(store, catalog, async () => false);
+    const service = await catalog.register({ name: '降级', slug: 'degrade-svc', ownerId: 'ops' });
+    const preview = await previews.request({ serviceId: 'degrade-svc', prNumber: 5, actorId: 't' });
+    const result = await previews.deploy(preview.id);
+    expect(result.deployed).toBe(false);
+    expect(result.note).toMatch(/docker not available/);
+    expect(result.url).toContain('preview-pr');
+    expect(service).toBeTruthy();
+  });
+});
+
 describe('container-build job (D6)', () => {
   function waitForRun(runs: WorkflowRunsService, runId: string): Promise<RunView> {
     return new Promise((resolve, reject) => {

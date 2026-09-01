@@ -1,8 +1,24 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import { AGGREGATE, EVENT, makeEvent, newId, newChangeTraceId } from '../../events';
 import { EVENT_STORE, type EventStore } from '../../events';
 import { CatalogService } from '../catalog/catalog.service';
+import { hasBinary } from '../workflows/job-registry';
 import { previewEnvName, previewUrl, type PreviewEnvStatus, type PreviewEnvView } from './preview.types';
+
+const execAsync = promisify(exec);
+const DEFAULT_PREVIEW_IMAGE = 'busybox:latest';
+
+export interface DeployResult {
+  deployed: boolean;
+  id: string;
+  url?: string;
+  container?: string;
+  port?: number;
+  image?: string;
+  note?: string;
+}
 
 interface PreviewEnvAggregate {
   traceId: string;
@@ -16,14 +32,22 @@ interface PreviewEnvAggregate {
   createdAt: string;
   destroyedAt?: string;
   ttlHours: number;
+  container?: string;
+  port?: number;
+  image?: string;
 }
 
 @Injectable()
 export class PreviewsService {
+  private readonly dockerProbe: () => Promise<boolean>;
+
   constructor(
     @Inject(EVENT_STORE) private readonly eventStore: EventStore,
     private readonly catalog: CatalogService,
-  ) {}
+    @Optional() dockerProbe?: () => Promise<boolean>,
+  ) {
+    this.dockerProbe = dockerProbe ?? (() => hasBinary('docker'));
+  }
 
   async request(input: {
     serviceId: string;
@@ -85,6 +109,48 @@ export class PreviewsService {
     return view;
   }
 
+  async deploy(id: string, opts?: { image?: string }): Promise<DeployResult> {
+    const aggregate = await this.load(id);
+    if (!aggregate) {
+      throw new NotFoundException(`preview env ${id} not found`);
+    }
+    if (aggregate.status === 'destroyed') {
+      throw new ConflictException(`preview env ${id} already destroyed`);
+    }
+    if (!(await this.dockerProbe())) {
+      return { deployed: false, id, note: 'docker not available; stub preview URL kept', url: aggregate.url };
+    }
+
+    const image = opts?.image || process.env.JACK_PREVIEW_IMAGE || DEFAULT_PREVIEW_IMAGE;
+    const container = `jack-preview-pr${aggregate.prNumber}-${id.slice(-8)}`;
+    const port = 30000 + Math.floor(Math.random() * 9000);
+    const isBusybox = image === DEFAULT_PREVIEW_IMAGE;
+    const command = isBusybox
+      ? `docker run -d --name ${container} -p ${port}:80 ${image} sh -c "echo '<h1>preview ${container}</h1>' > index.html && httpd -f -p 80"`
+      : `docker run -d --name ${container} -p ${port}:80 ${image}`;
+    try {
+      await execAsync(`docker rm -f ${container}`, { windowsHide: true }).catch(() => undefined);
+      await execAsync(command, { timeout: 120_000, windowsHide: true });
+    } catch (err) {
+      const e = err as { stderr?: string; message?: string };
+      return { deployed: false, id, note: `docker run failed: ${(e.stderr || e.message || '').slice(0, 200)}` };
+    }
+
+    const url = `http://localhost:${port}`;
+    await this.eventStore.append(
+      makeEvent({
+        traceId: aggregate.traceId,
+        type: EVENT.previewEnvReady,
+        aggregateType: AGGREGATE.previewEnv,
+        aggregateId: id,
+        actor: { type: 'system', id: 'preview-runner' },
+        payload: { url, container, port, image },
+      }),
+    );
+    const view = await this.project(id);
+    return { deployed: true, id, url, container, port, image };
+  }
+
   async markReady(id: string, url?: string): Promise<PreviewEnvView> {
     const aggregate = await this.load(id);
     if (!aggregate) {
@@ -113,6 +179,9 @@ export class PreviewsService {
     }
     if (aggregate.status === 'destroyed') {
       throw new ConflictException(`preview env ${id} already destroyed`);
+    }
+    if (aggregate.container) {
+      await execAsync(`docker rm -f ${aggregate.container}`, { windowsHide: true }).catch(() => undefined);
     }
     await this.eventStore.append(
       makeEvent({
@@ -195,6 +264,9 @@ export class PreviewsService {
       } else if (event.type === EVENT.previewEnvReady && aggregate) {
         aggregate.status = 'ready';
         aggregate.url = ((event.payload.url as string | null) ?? aggregate.url) || undefined;
+        aggregate.container = ((event.payload.container as string | null) ?? aggregate.container) || undefined;
+        aggregate.port = ((event.payload.port as number | null) ?? aggregate.port) || undefined;
+        aggregate.image = ((event.payload.image as string | null) ?? aggregate.image) || undefined;
       } else if (event.type === EVENT.previewEnvDestroyed && aggregate) {
         aggregate.status = 'destroyed';
         aggregate.destroyedAt = event.occurredAt;
@@ -221,6 +293,9 @@ export class PreviewsService {
       createdAt: aggregate.createdAt,
       destroyedAt: aggregate.destroyedAt,
       ttlHours: aggregate.ttlHours,
+      container: aggregate.container,
+      port: aggregate.port,
+      image: aggregate.image,
     };
   }
 }

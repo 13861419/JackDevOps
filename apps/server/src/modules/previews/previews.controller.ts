@@ -17,8 +17,13 @@ const readyDto = z.object({
   url: z.string().max(500).optional(),
 });
 
+const deployDto = z.object({
+  image: z.string().max(200).optional(),
+});
+
 type RequestDto = z.infer<typeof requestDto>;
 type ReadyDto = z.infer<typeof readyDto>;
+type DeployDto = z.infer<typeof deployDto>;
 
 @Controller('previews')
 export class PreviewsController {
@@ -42,6 +47,11 @@ export class PreviewsController {
   @Post(':id/ready')
   ready(@Param('id') id: string, @Body(new ZodValidationPipe(readyDto)) dto: ReadyDto) {
     return this.previews.markReady(id, dto.url);
+  }
+
+  @Post(':id/deploy')
+  async deploy(@Param('id') id: string, @Body(new ZodValidationPipe(deployDto)) dto: DeployDto) {
+    return this.previews.deploy(id, dto);
   }
 
   @Delete(':id')
