@@ -159,8 +159,65 @@ export class ReleasesService {
         payload: { version: aggregate.version },
       }),
     );
+    await this.recordProvenance(id, aggregate);
     const view = await this.project(id);
     return view as ReleaseView;
+  }
+
+  async provenance(id: string): Promise<{
+    releaseId: string;
+    version: string;
+    buildType: string;
+    builder: { id: string };
+    invocation: { commit: string | null; runId: string; traceId: string; triggeredBy: string };
+    materials: { commit: string | null; runId: string }[];
+    artifacts: string[];
+    recordedAt: string | null;
+    releaseCreated: string;
+  } | null> {
+    const aggregate = await this.load(id);
+    if (!aggregate) {
+      return null;
+    }
+    const events = await this.eventStore.listByAggregate(AGGREGATE.release, id);
+    const recorded = events.find((e) => e.type === EVENT.releaseProvenanceRecorded);
+    return {
+      releaseId: id,
+      version: aggregate.version,
+      buildType: 'https://jackdevops.dev/buildtypes/workflow-run/v1',
+      builder: { id: 'jackdevops://agent-gateway/workflow-runner' },
+      invocation: {
+        commit: (recorded?.payload.commit as string | null) ?? null,
+        runId: aggregate.runId,
+        traceId: aggregate.traceId,
+        triggeredBy: (recorded?.payload.triggeredBy as string) ?? 'unknown',
+      },
+      materials: [{ commit: (recorded?.payload.commit as string | null) ?? null, runId: aggregate.runId }],
+      artifacts: aggregate.artifacts,
+      recordedAt: recorded?.occurredAt ?? aggregate.createdAt,
+      releaseCreated: aggregate.createdAt,
+    };
+  }
+
+  private async recordProvenance(releaseId: string, aggregate: ReleaseAggregate): Promise<void> {
+    const started = await this.eventStore
+      .listByAggregate(AGGREGATE.workflowRun, aggregate.runId)
+      .then((events) => events.find((e) => e.type === EVENT.runStarted));
+    await this.eventStore.append(
+      makeEvent({
+        traceId: aggregate.traceId,
+        type: EVENT.releaseProvenanceRecorded,
+        aggregateType: AGGREGATE.release,
+        aggregateId: releaseId,
+        actor: { type: 'system', id: 'workflow-runner' },
+        payload: {
+          commit: (started?.payload.commit as string | null) ?? null,
+          runId: aggregate.runId,
+          artifacts: aggregate.artifacts,
+          triggeredBy: started?.actor.id ?? 'unknown',
+        },
+      }),
+    );
   }
 
   async rollback(id: string, reason: string, actorId: string): Promise<ReleaseView> {

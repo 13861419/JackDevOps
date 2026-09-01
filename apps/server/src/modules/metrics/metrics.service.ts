@@ -8,7 +8,7 @@ export interface DoraMetrics {
   deploymentFrequencyPerDay: number;
   changeFailureRate: number | null;
   mttrMinutes: number | null;
-  leadTimeMinutes: null;
+  leadTimeMinutes: number | null;
 }
 
 @Injectable()
@@ -45,6 +45,27 @@ export class MetricsService {
       }
     }
 
+    const registered = await this.eventStore.listByType(EVENT.releaseRegistered);
+    const promoted = (await this.eventStore.listByType(EVENT.releasePromoted)).filter(
+      (e) => Date.parse(e.occurredAt) >= windowStart,
+    );
+    const runStartedByRun = new Map<string, string>();
+    for (const event of started) {
+      runStartedByRun.set(event.aggregateId, event.occurredAt);
+    }
+    const registeredByAggregate = new Map<string, string>();
+    for (const event of registered) {
+      registeredByAggregate.set(event.aggregateId, event.payload.runId as string);
+    }
+    const leadTimes: number[] = [];
+    for (const promoteEvent of promoted) {
+      const runId = registeredByAggregate.get(promoteEvent.aggregateId);
+      const runStartedAt = runId ? runStartedByRun.get(runId) : undefined;
+      if (runStartedAt) {
+        leadTimes.push((Date.parse(promoteEvent.occurredAt) - Date.parse(runStartedAt)) / 60000);
+      }
+    }
+
     return {
       windowDays: days,
       deployments: succeeded.length,
@@ -53,8 +74,11 @@ export class MetricsService {
       mttrMinutes:
         mttrValues.length === 0
           ? null
-          : Math.round((mttrValues.reduce((a, b) => a + b, 0) / mttrValues.length / 60000) * 10) / 10,
-      leadTimeMinutes: null,
+          : Math.round((mttrValues.reduce((a, b) => a + b, 0) / mttrValues.length) * 10) / 10,
+      leadTimeMinutes:
+        leadTimes.length === 0
+          ? null
+          : Math.round((leadTimes.reduce((a, b) => a + b, 0) / leadTimes.length) * 10) / 10,
     };
   }
 }

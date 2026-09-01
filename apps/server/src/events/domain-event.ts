@@ -65,6 +65,9 @@ export const EVENT = {
   driftReconciled: 'drift.reconciled',
   releaseRedeployed: 'release.redeployed',
   scaffoldApplied: 'scaffold.applied',
+  secretRefRegistered: 'secret.ref_registered',
+  secretRefDeleted: 'secret.ref_deleted',
+  releaseProvenanceRecorded: 'release.provenance_recorded',
 } as const;
 
 export function newId(prefix: string): string {

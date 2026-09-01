@@ -50,6 +50,11 @@ export class ReleasesController {
     return this.releases.notes(id);
   }
 
+  @Get(':id/provenance')
+  provenance(@Param('id') id: string) {
+    return this.releases.provenance(id);
+  }
+
   @Post(':id/approve')
   approve(@Param('id') id: string, @Body(new ZodValidationPipe(approveDto)) dto: ApproveDto) {
     return this.releases.approve(id, dto);

@@ -9,6 +9,8 @@ import Flags from './pages/Flags';
 import Tests from './pages/Tests';
 import Audit from './pages/Audit';
 import Previews from './pages/Previews';
+import Docs from './pages/Docs';
+import Drift from './pages/Drift';
 import CommandPalette from './components/CommandPalette';
 import AiSidebar from './components/AiSidebar';
 
@@ -22,6 +24,8 @@ const NAV = [
   { hash: '#/tests', label: '测试管理' },
   { hash: '#/flags', label: '特性开关' },
   { hash: '#/previews', label: '预览环境' },
+  { hash: '#/docs', label: '文档' },
+  { hash: '#/drift', label: '配置漂移' },
   { hash: '#/audit', label: '审计' },
 ];
 
@@ -86,6 +90,8 @@ function renderRoute(route: string): ReactNode {
   if (route.startsWith('#/workflows')) return <Workflows />;
   if (route.startsWith('#/flags')) return <Flags />;
   if (route.startsWith('#/previews')) return <Previews />;
+  if (route.startsWith('#/docs')) return <Docs />;
+  if (route.startsWith('#/drift')) return <Drift />;
   if (route.startsWith('#/tests')) return <Tests />;
   if (route.startsWith('#/audit')) return <Audit />;
   if (route.startsWith('#/runs/')) return <RunDetail id={route.slice('#/runs/'.length)} />;

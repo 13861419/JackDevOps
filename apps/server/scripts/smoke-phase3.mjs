@@ -51,4 +51,17 @@ if (!drift.hasDrift) throw new Error('drift should be detected');
 const qa = await api('POST', '/ai/catalog-qa', { question: `${slug} 是什么服务？`, actorId: 'smoke' });
 console.log('5) catalog-qa mode:', qa.mode, '| answer head:', qa.answer.slice(0, 60).replace(/\n/g, ' '));
 
+await api('POST', `/secrets/${slug}`, { key: 'DB_PASSWORD', provider: 'vault', ref: 'secret/pay/db', actorId: 'smoke' });
+const env = await api('POST', `/secrets/${slug}/resolve`, { actorId: 'smoke' });
+console.log('6) secret ref resolved:', env.env.DB_PASSWORD);
+if (env.env.DB_PASSWORD !== 'external://vault/secret/pay/db') throw new Error('secret ref resolution failed');
+
+const prov = await api('GET', `/releases/${release.id}/provenance`);
+console.log('7) provenance:', prov.buildType.split('/').pop(), '| artifacts:', prov.artifacts.join(','));
+if (!prov.invocation.runId) throw new Error('provenance missing runId');
+
+const dora = await api('GET', '/metrics/dora?days=30');
+console.log('8) DORA leadTimeMinutes:', dora.leadTimeMinutes);
+if (dora.leadTimeMinutes === null) throw new Error('lead time not computed');
+
 console.log('SMOKE P3 OK');

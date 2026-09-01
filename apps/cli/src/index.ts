@@ -74,6 +74,14 @@ Commands:
   workflows list                   List workflows
   workflows run <workflowId>       Run a workflow
   runs <runId>                     Show run status and event trace
+  scaffold --slug <s> --name <n> --language <l>
+                                   Golden-path scaffold: service + pipeline
+  docs <slug> [--content <md>]     Get or upsert service docs (TechDocs)
+  drift <slug> [--image <img>]     Check config drift; --image to compare
+  drift <slug> reconcile           Mark drift as reconciled
+  previews [list|create|destroy]   Preview environments
+  provenance <releaseId>           SLSA-lite build provenance
+  dora [--days <n>]                DORA metrics (incl. lead time)
 `;
 
 async function main(): Promise<void> {
@@ -154,6 +162,72 @@ async function main(): Promise<void> {
       console.log(
         JSON.stringify({ run, events: trace.map((e) => e.type) }, null, 2),
       );
+      return;
+    }
+    case 'scaffold': {
+      const res = await api(config, 'POST', '/scaffold', {
+        name: flags.name ?? '',
+        slug: flags.slug ?? '',
+        language: flags.language ?? 'node',
+        actorId: 'cli',
+      });
+      console.log(JSON.stringify(res, null, 2));
+      return;
+    }
+    case 'docs': {
+      const slug = positional[0];
+      if (flags.content) {
+        const doc = await api(config, 'PUT', `/docs/${slug}`, { content: flags.content, actorId: 'cli' });
+        console.log(JSON.stringify(doc, null, 2));
+      } else {
+        const doc = await api(config, 'GET', `/docs/${slug}`);
+        console.log(JSON.stringify(doc, null, 2));
+      }
+      return;
+    }
+    case 'drift': {
+      const slug = positional[0];
+      if (sub() === 'reconcile' || flags.reconcile === 'true') {
+        const res = await api(config, 'POST', `/drift/${slug}/reconcile`, { actorId: 'cli' });
+        console.log(JSON.stringify(res, null, 2));
+        return;
+      }
+      const report = await api(config, 'POST', `/drift/${slug}/check`, {
+        image: flags.image,
+        actorId: 'cli',
+      });
+      console.log(JSON.stringify(report, null, 2));
+      return;
+    }
+    case 'previews': {
+      const action = sub();
+      if (action === 'create') {
+        const res = await api(config, 'POST', '/previews', {
+          serviceId: flags.service ?? '',
+          prNumber: Number(flags.pr ?? 0),
+          actorId: 'cli',
+        });
+        console.log(JSON.stringify(res, null, 2));
+        return;
+      }
+      if (action === 'destroy') {
+        const res = await api(config, 'DELETE', `/previews/${positional[1]}`);
+        console.log(JSON.stringify(res, null, 2));
+        return;
+      }
+      const list = await api(config, 'GET', '/previews');
+      console.log(JSON.stringify(list, null, 2));
+      return;
+    }
+    case 'provenance': {
+      const res = await api(config, 'GET', `/releases/${positional[0]}/provenance`);
+      console.log(JSON.stringify(res, null, 2));
+      return;
+    }
+    case 'dora': {
+      const days = Number(flags.days ?? 30);
+      const res = await api(config, 'GET', `/metrics/dora?days=${days}`);
+      console.log(JSON.stringify(res, null, 2));
       return;
     }
     default:

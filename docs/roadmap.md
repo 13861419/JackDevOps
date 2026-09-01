@@ -58,6 +58,18 @@
 
 **验收**：差异化承诺全部兑现（PRD §2 七大痛点闭环）。
 
+### Phase 3 交付状态（M6 收尾，2026-09）
+
+- [x] B3 黄金路径脚手架：`POST /scaffold` + CLI `jack scaffold`
+- [x] B4 TechDocs：文档 CRUD + 陈旧度标记 + Web 文档页
+- [x] F7 漂移检测与 reconcile：期望 vs 实际快照 + Web 漂移页
+- [x] D5 关联物回滚：rollback 自动对上一 stable 版本发 redeploy
+- [x] E6 目录问答 Agent：`/ai/catalog-qa`（LLM/Rules 双模式）
+- [x] A5 完整版：DORA Lead Time for Changes（runStarted → promote 均值）
+- [x] F8 密钥外部引用模型：只存 `external://provider/ref` 指针，绝不存值
+- [x] F9-lite SLSA：promote 时落 `release.provenance_recorded` + `GET /releases/:id/provenance`
+- [ ] 依赖真实 K8s 集群：D8 Preview 实际部署 pod、D6 真实镜像构建、F2 多租户、插件市场（模型已预留）
+
 ---
 
 ## 里程碑原则
