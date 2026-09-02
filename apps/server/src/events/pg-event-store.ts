@@ -20,6 +20,7 @@ const domainEvents = pgTable(
     actorId: varchar('actor_id', { length: 64 }).notNull(),
     payload: jsonb('payload').notNull(),
     occurredAt: varchar('occurred_at', { length: 64 }).notNull(),
+    aggregateVersion: integer('aggregate_version').notNull().default(1),
   },
   (t) => [
     index('idx_domain_events_trace').on(t.traceId),
@@ -52,7 +53,8 @@ export class PgEventStore implements EventStore, OnModuleInit {
         actor_type VARCHAR(16) NOT NULL,
         actor_id VARCHAR(64) NOT NULL,
         payload JSONB NOT NULL,
-        occurred_at VARCHAR(64) NOT NULL
+        occurred_at VARCHAR(64) NOT NULL,
+        aggregate_version INTEGER NOT NULL DEFAULT 1
       )
     `);
     await this.db.execute(sql`CREATE INDEX IF NOT EXISTS idx_domain_events_trace ON domain_events (trace_id)`);
@@ -60,6 +62,25 @@ export class PgEventStore implements EventStore, OnModuleInit {
       sql`CREATE INDEX IF NOT EXISTS idx_domain_events_aggregate ON domain_events (aggregate_type, aggregate_id)`,
     );
     await this.db.execute(sql`CREATE INDEX IF NOT EXISTS idx_domain_events_type ON domain_events (type)`);
+    await this.db.execute(sql`
+      ALTER TABLE domain_events ADD COLUMN IF NOT EXISTS aggregate_version INTEGER NOT NULL DEFAULT 1
+    `);
+    await this.db.execute(sql`
+      UPDATE domain_events
+      SET aggregate_version = sub.rn
+      FROM (
+        SELECT seq, ROW_NUMBER() OVER (PARTITION BY aggregate_type, aggregate_id ORDER BY seq) AS rn
+        FROM domain_events
+      ) sub
+      WHERE domain_events.seq = sub.seq
+    `);
+    await this.db.execute(sql`
+      ALTER TABLE domain_events DROP CONSTRAINT IF EXISTS uq_domain_events_aggregate_version
+    `);
+    await this.db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_domain_events_aggregate_version
+      ON domain_events (aggregate_type, aggregate_id, aggregate_version)
+    `);
     this.logger.log('domain_events table ready');
   }
 
@@ -75,6 +96,10 @@ export class PgEventStore implements EventStore, OnModuleInit {
       actorId: event.actor.id,
       payload: event.payload,
       occurredAt: event.occurredAt,
+      aggregateVersion: sql`
+        (SELECT COALESCE(MAX(aggregate_version), 0) + 1 FROM domain_events
+         WHERE aggregate_type = ${event.aggregateType} AND aggregate_id = ${event.aggregateId})
+      `,
     });
   }
 
@@ -93,7 +118,11 @@ export class PgEventStore implements EventStore, OnModuleInit {
   }
 
   async listByTrace(traceId: string): Promise<DomainEvent[]> {
-    const rows = await this.db.select().from(domainEvents).where(sql`${domainEvents.traceId} = ${traceId}`);
+    const rows = await this.db
+      .select()
+      .from(domainEvents)
+      .where(sql`${domainEvents.traceId} = ${traceId}`)
+      .orderBy(domainEvents.seq);
     return rows.map((r) => this.mapRow(r));
   }
 
@@ -101,12 +130,17 @@ export class PgEventStore implements EventStore, OnModuleInit {
     const rows = await this.db
       .select()
       .from(domainEvents)
-      .where(sql`${domainEvents.aggregateType} = ${aggregateType} AND ${domainEvents.aggregateId} = ${aggregateId}`);
+      .where(sql`${domainEvents.aggregateType} = ${aggregateType} AND ${domainEvents.aggregateId} = ${aggregateId}`)
+      .orderBy(domainEvents.seq);
     return rows.map((r) => this.mapRow(r));
   }
 
   async listByType(type: string): Promise<DomainEvent[]> {
-    const rows = await this.db.select().from(domainEvents).where(sql`${domainEvents.type} = ${type}`);
+    const rows = await this.db
+      .select()
+      .from(domainEvents)
+      .where(sql`${domainEvents.type} = ${type}`)
+      .orderBy(domainEvents.seq);
     return rows.map((r) => this.mapRow(r));
   }
 
