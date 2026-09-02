@@ -1,3 +1,4 @@
+import { RunExecutor } from '../src/modules/runqueue/run-executor.service';
 import { describe, expect, it } from 'vitest';
 import { InMemoryEventStore, EVENT, AGGREGATE, makeEvent, newId } from '../src/events';
 import { WorkflowsService } from '../src/modules/workflows/workflows.service';
@@ -27,7 +28,7 @@ describe('releases (D4 progressive delivery)', () => {
   const store = new InMemoryEventStore();
   const registry = new JobRegistry();
   const workflows = new WorkflowsService(store, registry);
-  const runs = new WorkflowRunsService(store, registry);
+  const runs = new WorkflowRunsService(store, registry, new RunExecutor(store, registry));
   const releases = new ReleasesService(store);
 
   it('registers a release inheriting the run change fingerprint, promotes via canary steps after approval', async () => {

@@ -1,3 +1,4 @@
+import { RunExecutor } from '../src/modules/runqueue/run-executor.service';
 import { describe, expect, it } from 'vitest';
 import { InMemoryEventStore, EVENT } from '../src/events';
 import { JobRegistry } from '../src/modules/workflows/job-registry';
@@ -31,7 +32,7 @@ describe('A5 complete: DORA lead time for changes', () => {
     const catalog = new CatalogService(store);
     const registry = new JobRegistry();
     const workflows = new WorkflowsService(store, registry);
-    const runs = new WorkflowRunsService(store, registry);
+    const runs = new WorkflowRunsService(store, registry, new RunExecutor(store, registry));
     const releases = new ReleasesService(store);
     const metrics = new MetricsService(store);
 
@@ -104,7 +105,7 @@ describe('F9-lite: SLSA provenance', () => {
     const catalog = new CatalogService(store);
     const registry = new JobRegistry();
     const workflows = new WorkflowsService(store, registry);
-    const runs = new WorkflowRunsService(store, registry);
+    const runs = new WorkflowRunsService(store, registry, new RunExecutor(store, registry));
     const releases = new ReleasesService(store);
 
     const service = await catalog.register({ name: 'SLSA', slug: 'slsa-svc', ownerId: 'ops' });

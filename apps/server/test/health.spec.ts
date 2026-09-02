@@ -1,3 +1,4 @@
+import { RunExecutor } from '../src/modules/runqueue/run-executor.service';
 import { describe, expect, it } from 'vitest';
 import { HealthController } from '../src/modules/health/health.controller';
 

@@ -1,3 +1,4 @@
+import { RunExecutor } from '../src/modules/runqueue/run-executor.service';
 import { describe, expect, it } from 'vitest';
 import { InMemoryEventStore, EVENT, AGGREGATE } from '../src/events';
 import { JobRegistry } from '../src/modules/workflows/job-registry';
@@ -29,7 +30,7 @@ describe('shell execution (M3 real job runner)', () => {
   const store = new InMemoryEventStore();
   const registry = new JobRegistry();
   const workflows = new WorkflowsService(store, registry);
-  const runs = new WorkflowRunsService(store, registry);
+  const runs = new WorkflowRunsService(store, registry, new RunExecutor(store, registry));
 
   it('executes a real command and captures stdout', async () => {
     const wf = await workflows.create({
@@ -78,7 +79,7 @@ describe('git webhook (B1)', () => {
   const store = new InMemoryEventStore();
   const catalog = new CatalogService(store);
   const workflows = new WorkflowsService(store, new JobRegistry());
-  const runs = new WorkflowRunsService(store, new JobRegistry());
+  const runs = new WorkflowRunsService(store, new JobRegistry(), new RunExecutor(store, new JobRegistry()));
   const webhook = new GitWebhookService(
     catalog,
     workflows,

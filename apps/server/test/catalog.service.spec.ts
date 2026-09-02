@@ -1,3 +1,4 @@
+import { RunExecutor } from '../src/modules/runqueue/run-executor.service';
 import { describe, expect, it } from 'vitest';
 import { ConflictException } from '@nestjs/common';
 import { InMemoryEventStore } from '../src/events';

@@ -1,3 +1,4 @@
+import { RunExecutor } from '../src/modules/runqueue/run-executor.service';
 import { describe, expect, it } from 'vitest';
 import { InMemoryEventStore, EVENT } from '../src/events';
 import { JobRegistry } from '../src/modules/workflows/job-registry';
@@ -55,7 +56,7 @@ describe('PR webhook lifecycle (D8)', () => {
   const catalog = new CatalogService(store);
   const registry = new JobRegistry();
   const workflows = new WorkflowsService(store, registry);
-  const runs = new WorkflowRunsService(store, registry);
+  const runs = new WorkflowRunsService(store, registry, new RunExecutor(store, registry));
   const webhook = new GitWebhookService(catalog, workflows, runs, new PreviewsService(store, catalog));
 
   it('opened → preview created; closed → preview destroyed', async () => {
@@ -126,7 +127,7 @@ describe('container-build job (D6)', () => {
     const store2 = new InMemoryEventStore();
     const registry = new JobRegistry();
     const workflows = new WorkflowsService(store2, registry);
-    const runs = new WorkflowRunsService(store2, registry);
+    const runs = new WorkflowRunsService(store2, registry, new RunExecutor(store2, registry));
 
     const wf = await workflows.create({
       name: 'container-noop',

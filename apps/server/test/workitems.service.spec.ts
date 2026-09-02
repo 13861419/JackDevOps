@@ -1,3 +1,4 @@
+import { RunExecutor } from '../src/modules/runqueue/run-executor.service';
 import { describe, expect, it } from 'vitest';
 import { InMemoryEventStore, EVENT, AGGREGATE } from '../src/events';
 import { WorkItemsService } from '../src/modules/workitems/workitems.service';

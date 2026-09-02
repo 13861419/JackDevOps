@@ -1,3 +1,4 @@
+import { RunExecutor } from '../src/modules/runqueue/run-executor.service';
 import { describe, expect, it } from 'vitest';
 import { InMemoryEventStore, EVENT, AGGREGATE } from '../src/events';
 import { JobRegistry } from '../src/modules/workflows/job-registry';
@@ -78,7 +79,7 @@ describe('drift detection + reconcile (Phase 3)', () => {
   const catalog = new CatalogService(store);
   const registry = new JobRegistry();
   const workflows = new WorkflowsService(store, registry);
-  const runs = new WorkflowRunsService(store, registry);
+  const runs = new WorkflowRunsService(store, registry, new RunExecutor(store, registry));
   const releases = new ReleasesService(store);
   const drift = new DriftService(store, catalog, workflows, runs);
 
@@ -124,7 +125,7 @@ describe('chained rollback redeploy (Phase 3)', () => {
   const catalog = new CatalogService(store);
   const registry = new JobRegistry();
   const workflows = new WorkflowsService(store, registry);
-  const runs = new WorkflowRunsService(store, registry);
+  const runs = new WorkflowRunsService(store, registry, new RunExecutor(store, registry));
   const releases = new ReleasesService(store);
 
   it('rollback appends release.redeployed on the last stable release', async () => {
@@ -168,7 +169,7 @@ describe('catalog QA agent (Phase 3)', () => {
   const ai = new AiService(
     store,
     new LlmService(),
-    new WorkflowRunsService(store, registry),
+    new WorkflowRunsService(store, registry, new RunExecutor(store, registry)),
     new WorkflowsService(store, registry),
     catalog,
   );

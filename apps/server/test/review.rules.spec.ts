@@ -1,3 +1,4 @@
+import { RunExecutor } from '../src/modules/runqueue/run-executor.service';
 import { describe, expect, it } from 'vitest';
 import { runRules, type ReviewPRInput } from '../src/modules/review/review.rules';
 

@@ -1,3 +1,4 @@
+import { RunExecutor } from '../src/modules/runqueue/run-executor.service';
 import { describe, expect, it } from 'vitest';
 import { InMemoryEventStore, EVENT, AGGREGATE } from '../src/events';
 import { JobRegistry } from '../src/modules/workflows/job-registry';
@@ -71,7 +72,7 @@ describe('WorkflowRunsService (D1 execution)', () => {
   const store = new InMemoryEventStore();
   const registry = new JobRegistry();
   const workflows = new WorkflowsService(store, registry);
-  const runs = new WorkflowRunsService(store, registry);
+  const runs = new WorkflowRunsService(store, registry, new RunExecutor(store, registry));
 
   it('runs a serial chain in order and emits an event chain with one traceId', async () => {
     const wf = await workflows.create({

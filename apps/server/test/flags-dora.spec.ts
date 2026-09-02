@@ -1,3 +1,4 @@
+import { RunExecutor } from '../src/modules/runqueue/run-executor.service';
 import { describe, expect, it } from 'vitest';
 import { InMemoryEventStore, EVENT, AGGREGATE, makeEvent, newChangeTraceId, newId } from '../src/events';
 import { FlagsService } from '../src/modules/flags/flags.service';

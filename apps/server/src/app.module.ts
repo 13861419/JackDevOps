@@ -21,12 +21,14 @@ import { DocsModule } from './modules/docs/docs.module';
 import { DriftModule } from './modules/drift/drift.module';
 import { SecretsModule } from './modules/secrets/secrets.module';
 import { DemoModule } from './modules/demo/demo.module';
+import { RunQueueModule } from './modules/runqueue/runqueue.module';
 
 @Module({
   imports: [
     EventsModule,
     NotifyModule,
     AuthModule,
+    RunQueueModule,
     WorkItemsModule,
     CatalogModule,
     WorkflowsModule,
