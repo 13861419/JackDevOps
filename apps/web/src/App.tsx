@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { checkOidcEnabled, oidcStartUrl } from './api';
 import Dashboard from './pages/Dashboard';
 import Services from './pages/Services';
 import WorkItems from './pages/WorkItems';
@@ -43,6 +44,17 @@ export default function App() {
   const route = useHashRoute();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
+  const [oidcEnabled, setOidcEnabled] = useState(false);
+
+  useEffect(() => {
+    if (route.startsWith('#/auth?token=')) {
+      const token = route.slice('#/auth?token='.length);
+      localStorage.setItem('jack_token', decodeURIComponent(token));
+      window.location.hash = '#/';
+      window.location.reload();
+    }
+    checkOidcEnabled().then(setOidcEnabled);
+  }, [route]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -71,6 +83,11 @@ export default function App() {
         <div className="hint">
           按 <span className="kbd">Ctrl K</span> 打开命令面板
         </div>
+        {oidcEnabled && (
+          <a className="hint" href={oidcStartUrl()}>
+            使用 SSO 登录
+          </a>
+        )}
       </nav>
       <main className="content">{renderRoute(route)}</main>
       <button className="ai-fab" onClick={() => setAiOpen(true)}>

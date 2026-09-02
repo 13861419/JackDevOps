@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { CanActivate, ExecutionContext, SetMetadata } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { AuthService } from './auth.service';
 
 export interface AuthUser {
   id: string;
@@ -24,7 +25,10 @@ interface HttpRequest {
 export class AuthGuard implements CanActivate {
   private readonly users = new Map<string, AuthUser>();
 
-  constructor(private readonly reflector: Reflector) {
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly sessions: AuthService,
+  ) {
     const adminToken = process.env.JACK_ADMIN_TOKEN ?? 'dev-admin-token';
     this.users.set(adminToken, { id: 'admin', role: 'admin' });
     const extra = process.env.JACK_USERS;
@@ -56,7 +60,8 @@ export class AuthGuard implements CanActivate {
       : typeof queryToken === 'string'
         ? queryToken
         : null;
-    const user = token ? this.users.get(token) : undefined;
+    const user =
+      (token ? this.users.get(token) : undefined) ?? (token ? this.sessions.validate(token) : undefined);
     if (!user) {
       throw new ForbiddenException('missing or invalid bearer token');
     }

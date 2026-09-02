@@ -33,6 +33,20 @@ export function subscribeLiveRefresh(cb: () => void): () => void {
   return () => es.close();
 }
 
+export async function checkOidcEnabled(): Promise<boolean> {
+  try {
+    const res = await fetch('/api/auth/oidc/status');
+    const body = (await res.json()) as { enabled: boolean };
+    return Boolean(body.enabled);
+  } catch {
+    return false;
+  }
+}
+
+export function oidcStartUrl(): string {
+  return `${BASE}/auth/oidc/start`;
+}
+
 export const api = {
   get: <T = unknown>(path: string) => req<T>('GET', path),
   post: <T = unknown>(path: string, body?: unknown) => req<T>('POST', path, body),
