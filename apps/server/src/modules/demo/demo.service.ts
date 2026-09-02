@@ -81,9 +81,18 @@ export class DemoService {
     }
 
     let workItemCount = 0;
+    const itemIdsByService = new Map<string, string[]>();
     for (const item of DEMO_WORK_ITEMS) {
       const service = serviceViews.find((s) => s.slug === item.service);
-      await this.workItems.create({ title: item.title, kind: item.kind, serviceId: service?.id, actorId });
+      const created = await this.workItems.create({
+        title: item.title,
+        kind: item.kind,
+        serviceId: service?.id,
+        actorId,
+      });
+      const ids = itemIdsByService.get(item.service) ?? [];
+      ids.push(created.id);
+      itemIdsByService.set(item.service, ids);
       workItemCount += 1;
     }
 
@@ -93,7 +102,11 @@ export class DemoService {
     const versions = ['v1.0.0', 'v1.1.0', 'v1.2.0'];
     for (const { slug, workflow } of workflowViews) {
       for (let i = 0; i < versions.length; i++) {
-        const started = await this.runs.startRun(workflow.id, actorId, { commit: `demo${i}`, branch: 'main' });
+        const started = await this.runs.startRun(workflow.id, actorId, {
+          commit: `demo${i}`,
+          branch: 'main',
+          workItemIds: itemIdsByService.get(slug),
+        });
         await this.waitForRun(started.id);
         runCount += 1;
         const release = await this.releases.register({

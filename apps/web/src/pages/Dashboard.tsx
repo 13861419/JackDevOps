@@ -7,6 +7,17 @@ interface Dora {
   deploymentFrequencyPerDay: number;
   changeFailureRate: number | null;
   mttrMinutes: number | null;
+  leadTimeMinutes: number | null;
+}
+
+interface LeadTime {
+  medianLeadTimeMinutes: number | null;
+}
+
+interface Costs {
+  windowDays: number;
+  totalCostUsd: number;
+  services: { serviceId: string; costUsd: number }[];
 }
 
 export default function Dashboard() {
@@ -14,6 +25,8 @@ export default function Dashboard() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [runs, setRuns] = useState<Run[]>([]);
   const [dora, setDora] = useState<Dora | null>(null);
+  const [leadTime, setLeadTime] = useState<LeadTime | null>(null);
+  const [costs, setCosts] = useState<Costs | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -26,6 +39,8 @@ export default function Dashboard() {
         })
         .catch((e) => setError(String(e)));
       api.get<Dora>('/metrics/dora').then(setDora).catch(() => undefined);
+      api.get<LeadTime>('/metrics/lead-time').then(setLeadTime).catch(() => undefined);
+      api.get<Costs>('/metrics/costs').then(setCosts).catch(() => undefined);
     };
     reload();
     return subscribeLiveRefresh(reload);
@@ -56,7 +71,20 @@ export default function Dashboard() {
             变更失败率: {dora?.changeFailureRate == null ? '-' : `${(dora.changeFailureRate * 100).toFixed(1)}%`}
           </p>
           <p className="muted" style={{ margin: '4px 0' }}>
-            MTTR: {dora?.mttrMinutes == null ? '-' : `${dora.mttrMinutes} 分钟`}
+            MTTR: {dora?.mttrMinutes == null ? '-' : `${dora.mttrMinutes} 分钟`} · Lead Time:{' '}
+            {dora?.leadTimeMinutes == null ? '-' : `${dora.leadTimeMinutes} 分钟`}
+          </p>
+        </div>
+        <div className="card">
+          <h2>度量与成本（近 {costs?.windowDays ?? 30} 天）</h2>
+          <p className="muted" style={{ margin: '4px 0' }}>
+            需求 Lead Time 中位数: {leadTime?.medianLeadTimeMinutes == null ? '-' : `${leadTime.medianLeadTimeMinutes} 分钟`}
+          </p>
+          <p className="muted" style={{ margin: '4px 0' }}>
+            基础设施成本估算: ${costs?.totalCostUsd ?? 0}
+          </p>
+          <p className="muted" style={{ margin: '4px 0' }}>
+            成本 Top1: {costs?.services[0]?.serviceId ?? '-'}（${costs?.services[0]?.costUsd ?? 0}）
           </p>
         </div>
       </div>
