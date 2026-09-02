@@ -20,6 +20,7 @@ import { ScaffoldModule } from './modules/scaffold/scaffold.module';
 import { DocsModule } from './modules/docs/docs.module';
 import { DriftModule } from './modules/drift/drift.module';
 import { SecretsModule } from './modules/secrets/secrets.module';
+import { DemoModule } from './modules/demo/demo.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { SecretsModule } from './modules/secrets/secrets.module';
     DocsModule,
     DriftModule,
     SecretsModule,
+    DemoModule,
   ],
 })
 export class AppModule {}

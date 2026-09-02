@@ -1,10 +1,9 @@
-import { Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, OnModuleInit, Optional } from '@nestjs/common';
 import { AGGREGATE, EVENT, makeEvent, newId } from '../../events';
 import { EVENT_STORE, type EventStore, type DomainEvent } from '../../events';
 import { JobRegistry } from './job-registry';
 import type { JobSpec, JobStatus, RunMeta, RunStatus } from './workflow.types';
 import { NotifyService } from '../notify/notify.service';
-
 export interface RunJobView {
   id: string;
   type: string;
@@ -24,7 +23,7 @@ export interface RunView {
 }
 
 @Injectable()
-export class WorkflowRunsService {
+export class WorkflowRunsService implements OnModuleInit {
   private readonly runs = new Map<string, RunView>();
 
   constructor(
@@ -32,6 +31,63 @@ export class WorkflowRunsService {
     private readonly jobRegistry: JobRegistry,
     @Optional() private readonly notify?: NotifyService,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    await this.hydrate();
+  }
+
+  private async hydrate(): Promise<void> {
+    const startedEvents = await this.eventStore.listByType(EVENT.runStarted);
+    const completedByRun = new Map<string, DomainEvent>();
+    for (const event of await this.eventStore.listByType(EVENT.runCompleted)) {
+      completedByRun.set(event.aggregateId, event);
+    }
+    const workflowNames = new Map<string, string>();
+    for (const event of await this.eventStore.listByType(EVENT.workflowCreated)) {
+      workflowNames.set(event.aggregateId, event.payload.name as string);
+    }
+    const jobEventsByRun = new Map<string, DomainEvent[]>();
+    for (const type of [EVENT.jobStarted, EVENT.jobSucceeded, EVENT.jobFailed, EVENT.jobSkipped]) {
+      for (const event of await this.eventStore.listByType(type)) {
+        const list = jobEventsByRun.get(event.aggregateId) ?? [];
+        list.push(event);
+        jobEventsByRun.set(event.aggregateId, list);
+      }
+    }
+    for (const started of startedEvents) {
+      if (this.runs.has(started.aggregateId)) {
+        continue;
+      }
+      const jobIds = (started.payload.jobIds as string[]) ?? [];
+      const jobStatus = new Map<string, JobStatus>();
+      for (const event of jobEventsByRun.get(started.aggregateId) ?? []) {
+        const jobId = event.payload.jobId as string;
+        if (event.type === EVENT.jobSucceeded) {
+          jobStatus.set(jobId, 'succeeded');
+        } else if (event.type === EVENT.jobFailed) {
+          jobStatus.set(jobId, 'failed');
+        } else if (event.type === EVENT.jobSkipped) {
+          jobStatus.set(jobId, 'skipped');
+        } else if (!jobStatus.has(jobId)) {
+          jobStatus.set(jobId, 'running');
+        }
+      }
+      const completed = completedByRun.get(started.aggregateId);
+      const view: RunView = {
+        id: started.aggregateId,
+        workflowId: started.payload.workflowId as string,
+        workflowName: (workflowNames.get(started.payload.workflowId as string) ?? '-'),
+        traceId: started.traceId,
+        status: (completed?.payload.status as RunStatus) ?? 'running',
+        jobs: jobIds.map((id) => ({ id, type: '', status: jobStatus.get(id) ?? 'pending' })),
+        meta: (started.payload.meta as RunMeta) ?? undefined,
+        startedAt: started.occurredAt,
+        finishedAt: completed?.occurredAt,
+      };
+      this.runs.set(started.aggregateId, view);
+    }
+  }
+
 
   async startRun(workflowId: string, actorId: string, meta?: RunMeta): Promise<RunView> {
     const workflow = await this.eventStore

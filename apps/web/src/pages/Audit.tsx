@@ -6,7 +6,10 @@ export default function Audit() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    api.get<DomainEventView[]>('/audit?limit=200').then(setEvents).catch((e) => setError(String(e)));
+    api
+      .get<{ total: number; events: DomainEventView[] }>('/audit?limit=200')
+      .then((res) => setEvents(res.events ?? []))
+      .catch((e) => setError(String(e)));
   }, []);
 
   return (

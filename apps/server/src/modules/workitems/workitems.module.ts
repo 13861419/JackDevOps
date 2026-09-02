@@ -5,5 +5,6 @@ import { WorkItemsService } from './workitems.service';
 @Module({
   controllers: [WorkItemsController],
   providers: [WorkItemsService],
+  exports: [WorkItemsService],
 })
 export class WorkItemsModule {}
