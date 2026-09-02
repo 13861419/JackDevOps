@@ -6,7 +6,17 @@ export class MetricsController {
   constructor(private readonly metrics: MetricsService) {}
 
   @Get('dora')
-  dora() {
-    return this.metrics.dora(30);
+  dora(@Query('days') days?: string) {
+    return this.metrics.dora(Number(days) || 30);
+  }
+
+  @Get('lead-time')
+  leadTime(@Query('days') days?: string) {
+    return this.metrics.leadTime(Number(days) || 30);
+  }
+
+  @Get('costs')
+  costs(@Query('days') days?: string) {
+    return this.metrics.costs(Number(days) || 30);
   }
 }

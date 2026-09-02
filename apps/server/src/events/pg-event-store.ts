@@ -34,10 +34,12 @@ export class PgEventStore implements EventStore, OnModuleInit {
   private readonly logger = new Logger(PgEventStore.name);
   private readonly pool: Pool;
   private readonly db: NodePgDatabase<Record<string, never>>;
+  private bus?: { publish(event: DomainEvent): void };
 
-  constructor(databaseUrl: string) {
+  constructor(databaseUrl: string, bus?: { publish(event: DomainEvent): void }) {
     this.pool = new Pool({ connectionString: databaseUrl, max: 5 });
     this.db = drizzle(this.pool);
+    this.bus = bus;
   }
 
   async onModuleInit(): Promise<void> {
@@ -101,6 +103,7 @@ export class PgEventStore implements EventStore, OnModuleInit {
          WHERE aggregate_type = ${event.aggregateType} AND aggregate_id = ${event.aggregateId})
       `,
     });
+    this.bus?.publish(event);
   }
 
   private mapRow(row: typeof domainEvents.$inferSelect): DomainEvent {

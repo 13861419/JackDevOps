@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, type Run, type ServiceView, type Workflow, STATUS_LABELS } from '../api';
+import { api, subscribeLiveRefresh, type Run, type ServiceView, type Workflow, STATUS_LABELS } from '../api';
 
 interface Dora {
   windowDays: number;
@@ -17,14 +17,18 @@ export default function Dashboard() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    Promise.all([api.get<ServiceView[]>('/services'), api.get<Workflow[]>('/workflows'), api.get<Run[]>('/runs')])
-      .then(([s, w, r]) => {
-        setServices(s);
-        setWorkflows(w);
-        setRuns(r);
-      })
-      .catch((e) => setError(String(e)));
-    api.get<Dora>('/metrics/dora').then(setDora).catch(() => undefined);
+    const reload = (): void => {
+      Promise.all([api.get<ServiceView[]>('/services'), api.get<Workflow[]>('/workflows'), api.get<Run[]>('/runs')])
+        .then(([s, w, r]) => {
+          setServices(s);
+          setWorkflows(w);
+          setRuns(r);
+        })
+        .catch((e) => setError(String(e)));
+      api.get<Dora>('/metrics/dora').then(setDora).catch(() => undefined);
+    };
+    reload();
+    return subscribeLiveRefresh(reload);
   }, []);
 
   return (

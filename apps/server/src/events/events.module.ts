@@ -2,24 +2,28 @@ import { Global, Module } from '@nestjs/common';
 import { Logger } from '@nestjs/common';
 import { InMemoryEventStore } from './event-store';
 import { PgEventStore } from './pg-event-store';
+import { EventBusService } from './event-bus.service';
+import { EventsStreamController } from './events-stream.controller';
 
 export const EVENT_STORE = 'EVENT_STORE';
 
 @Global()
 @Module({
+  controllers: [EventsStreamController],
   providers: [
+    EventBusService,
     {
       provide: EVENT_STORE,
-      useFactory: () => {
+      useFactory: (bus: EventBusService) => {
         if (process.env.DATABASE_URL) {
-          return new PgEventStore(process.env.DATABASE_URL);
+          return new PgEventStore(process.env.DATABASE_URL, bus);
         }
-        return new InMemoryEventStore();
+        return new InMemoryEventStore(bus);
       },
-      inject: [],
+      inject: [EventBusService],
     },
   ],
-  exports: [EVENT_STORE],
+  exports: [EVENT_STORE, EventBusService],
 })
 export class EventsModule {
   private readonly logger = new Logger(EventsModule.name);

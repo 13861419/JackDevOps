@@ -11,8 +11,11 @@ export interface EventStore {
 export class InMemoryEventStore implements EventStore {
   private readonly events: DomainEvent[] = [];
 
+  constructor(private readonly bus?: { publish(event: DomainEvent): void }) {}
+
   async append(event: DomainEvent): Promise<void> {
     this.events.push(event);
+    this.bus?.publish(event);
   }
 
   listByTrace(traceId: string): Promise<DomainEvent[]> {

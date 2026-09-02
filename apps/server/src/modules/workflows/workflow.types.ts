@@ -32,6 +32,7 @@ export interface RunMeta {
   commit?: string;
   branch?: string;
   triggeredBy?: string;
+  workItemIds?: string[];
 }
 
 export interface WorkflowView {

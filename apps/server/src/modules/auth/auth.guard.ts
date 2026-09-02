@@ -16,6 +16,7 @@ export const Roles = (...roles: AuthUser['role'][]): MethodDecorator & ClassDeco
 
 interface HttpRequest {
   headers: Record<string, string | undefined>;
+  query?: Record<string, string | undefined>;
   user?: AuthUser;
 }
 
@@ -49,7 +50,12 @@ export class AuthGuard implements CanActivate {
     }
     const request = context.switchToHttp().getRequest<HttpRequest>();
     const header = request.headers.authorization ?? '';
-    const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+    const queryToken = request.query?.token;
+    const token = header.startsWith('Bearer ')
+      ? header.slice(7)
+      : typeof queryToken === 'string'
+        ? queryToken
+        : null;
     const user = token ? this.users.get(token) : undefined;
     if (!user) {
       throw new ForbiddenException('missing or invalid bearer token');

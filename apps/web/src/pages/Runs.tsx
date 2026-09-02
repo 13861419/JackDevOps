@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
-import { api, STATUS_LABELS, type DomainEventView, type Run } from '../api';
+import { api, subscribeLiveRefresh, STATUS_LABELS, type DomainEventView, type Run } from '../api';
 
 export function Runs() {
   const [runs, setRuns] = useState<Run[]>([]);
 
   useEffect(() => {
-    api.get<Run[]>('/runs').then(setRuns).catch(() => undefined);
+    const reload = (): void => {
+      api.get<Run[]>('/runs').then(setRuns).catch(() => undefined);
+    };
+    reload();
+    return subscribeLiveRefresh(reload);
   }, []);
 
   return (

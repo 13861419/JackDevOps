@@ -20,6 +20,19 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
   return res.json() as Promise<T>;
 }
 
+export function subscribeLiveRefresh(cb: () => void): () => void {
+  const es = new EventSource(`${BASE}/events/stream?token=${encodeURIComponent(getToken())}`);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  es.onmessage = () => {
+    clearTimeout(timer);
+    timer = setTimeout(cb, 300);
+  };
+  es.onerror = () => {
+    clearTimeout(timer);
+  };
+  return () => es.close();
+}
+
 export const api = {
   get: <T = unknown>(path: string) => req<T>('GET', path),
   post: <T = unknown>(path: string, body?: unknown) => req<T>('POST', path, body),
