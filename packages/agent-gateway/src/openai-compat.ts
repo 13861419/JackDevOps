@@ -5,6 +5,7 @@ export interface OpenAICompatConfig {
   baseUrl: string;
   apiKey: string;
   model?: string;
+  maxTokens?: number;
   fetchImpl?: typeof fetch;
 }
 
@@ -13,6 +14,7 @@ export class OpenAICompatProvider implements AgentRuntime {
   readonly model: string;
   private readonly baseUrl: string;
   private readonly apiKey: string;
+  private readonly maxTokens: number;
   private readonly fetchImpl: typeof fetch;
 
   constructor(config: OpenAICompatConfig) {
@@ -20,6 +22,7 @@ export class OpenAICompatProvider implements AgentRuntime {
     this.baseUrl = config.baseUrl.replace(/\/+$/, '');
     this.apiKey = config.apiKey;
     this.model = config.model ?? 'deepseek-chat';
+    this.maxTokens = Number(config.maxTokens) || 4096;
     this.fetchImpl = config.fetchImpl ?? fetch;
   }
 
@@ -34,7 +37,7 @@ export class OpenAICompatProvider implements AgentRuntime {
         model: this.model,
         messages,
         temperature: opts?.temperature ?? 0.2,
-        max_tokens: opts?.maxTokens ?? 1024,
+        max_tokens: opts?.maxTokens ?? this.maxTokens,
         stream: false,
       }),
     });

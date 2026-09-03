@@ -16,6 +16,7 @@ export class LlmService {
         baseUrl,
         apiKey,
         model: process.env.JACK_LLM_MODEL ?? 'deepseek-chat',
+        maxTokens: Number(process.env.JACK_LLM_MAX_TOKENS) || undefined,
       });
     }
   }
