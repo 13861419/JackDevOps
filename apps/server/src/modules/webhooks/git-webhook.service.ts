@@ -97,5 +97,6 @@ function parseMeta(body: GitPushPayload): RunMeta {
     commit: typeof commit === 'string' ? commit : undefined,
     branch,
     triggeredBy: body.pusher?.name ?? 'git',
+    repoUrl: body.repository?.full_name,
   };
 }

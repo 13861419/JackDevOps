@@ -84,6 +84,7 @@ export class WorkflowRunsService implements OnModuleInit {
         .executeDag({
           runId,
           traceId: view.traceId,
+          workflowId: view.workflowId,
           workflowName: view.workflowName,
           jobs: spec.jobs,
           meta,

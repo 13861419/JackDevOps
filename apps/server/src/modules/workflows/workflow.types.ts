@@ -29,11 +29,12 @@ export type JobStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'skippe
 export type RunStatus = 'running' | 'succeeded' | 'failed';
 
 export interface RunMeta {
-  commit?: string;
-  branch?: string;
-  triggeredBy?: string;
-  workItemIds?: string[];
-}
+    commit?: string;
+    branch?: string;
+    triggeredBy?: string;
+    workItemIds?: string[];
+    repoUrl?: string;
+  }
 
 export interface WorkflowView {
   id: string;

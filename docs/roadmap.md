@@ -68,7 +68,9 @@
 - [x] A5 完整版：DORA Lead Time for Changes（runStarted → promote 均值）
 - [x] F8 密钥外部引用模型：只存 `external://provider/ref` 指针，绝不存值
 - [x] F9-lite SLSA：promote 时落 `release.provenance_recorded` + `GET /releases/:id/provenance`
-- [ ] 依赖真实 K8s 集群：D8 Preview 实际部署 pod、D6 真实镜像构建、F2 多租户、插件市场（模型已预留）
+- [x] M17 Git 状态回写：push 触发的 run 完成后回写 GitHub commit status（`JACK_GITHUB_TOKEN`，缺失优雅跳过）
+- [x] M17 D6 容器构建实测：docker build 上下文相对 Dockerfile 解析修复
+- [ ] 依赖真实 K8s 集群：D8 Preview pod 部署实测、F2 多租户、插件市场（模型已预留）
 
 ---
 

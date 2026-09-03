@@ -1,4 +1,5 @@
 import { exec, spawn } from 'node:child_process';
+import { isAbsolute } from 'node:path';
 import { promisify } from 'node:util';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import type { JobHandler, JobType } from './workflow.types';
@@ -179,9 +180,10 @@ function builtinHandlers(): JobHandler[] {
         }
         const dockerfile = typeof ctx.config.dockerfile === 'string' ? ctx.config.dockerfile : 'Dockerfile';
         const context = typeof ctx.config.context === 'string' ? ctx.config.context : '.';
+        const dockerfileArg = isAbsolute(dockerfile) ? dockerfile : `${context}/${dockerfile}`;
         const tag = typeof ctx.config.tag === 'string' ? ctx.config.tag : 'latest';
         const started = Date.now();
-        await runShell('container-build', `docker build -f ${dockerfile} -t ${image}:${tag} ${context}`, ctx.config);
+        await runShell('container-build', `docker build -f ${dockerfileArg} -t ${image}:${tag} ${context}`, ctx.config);
         if (ctx.config.push === true) {
           await runShell('container-build', `docker push ${image}:${tag}`, ctx.config);
         }

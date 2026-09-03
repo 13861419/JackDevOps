@@ -9,6 +9,7 @@ import type { RunView } from '../workflows/workflow-runs.service';
 export interface ExecuteDagInput {
   runId: string;
   traceId: string;
+  workflowId?: string;
   workflowName: string;
   jobs: JobSpec[];
   meta?: RunMeta;
@@ -92,7 +93,7 @@ export class RunExecutor {
     try {
       const runView: RunView = {
         id: runId,
-        workflowId: '',
+        workflowId: input.workflowId ?? '',
         workflowName,
         traceId,
         status,
@@ -107,7 +108,7 @@ export class RunExecutor {
     return status;
   }
 
-  async loadSpec(runId: string): Promise<{ jobs: JobSpec[]; traceId: string; workflowId: string; workflowName: string } | null> {
+  async loadSpec(runId: string): Promise<{ jobs: JobSpec[]; traceId: string; workflowId: string; workflowName: string; meta?: RunMeta } | null> {
     const started = await this.eventStore
       .listByAggregate(AGGREGATE.workflowRun, runId)
       .then((events) => events.find((e) => e.type === EVENT.runStarted));
@@ -126,6 +127,7 @@ export class RunExecutor {
       traceId: started.traceId,
       workflowId,
       workflowName: workflow.payload.name as string,
+      meta: (started.payload.meta as RunMeta | null) ?? undefined,
     };
   }
 

@@ -75,8 +75,10 @@ export class QueueService implements OnModuleDestroy {
     return this.executor.executeDag({
       runId,
       traceId: spec.traceId,
+      workflowId: spec.workflowId,
       workflowName: spec.workflowName,
       jobs: spec.jobs,
+      meta: spec.meta,
     });
   }
 
