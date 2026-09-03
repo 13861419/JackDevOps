@@ -221,12 +221,19 @@ export class PreviewsService {
         'get', 'svc', svc, '-n', ns,
         '-o', 'jsonpath={.spec.ports[0].nodePort}',
       ]);
-      const nodeIp = await this.kubectl([
-        'get', 'nodes', '-o',
-        'jsonpath={.items[0].status.addresses[?(@.type=="InternalIP")].address}',
-      ]);
       const port = Number.parseInt(nodePortRaw, 10);
-      const url = nodeIp && port ? `http://${nodeIp}:${port}` : `http://svc/${svc}`;
+      let url = port ? `http://${svc}:${port}` : `http://${svc}`;
+      try {
+        const nodeIp = await this.kubectl([
+          'get', 'nodes', '-o',
+          'jsonpath={.items[0].status.addresses[?(@.type=="InternalIP")].address}',
+        ]);
+        if (nodeIp && port) {
+          url = `http://${nodeIp}:${port}`;
+        }
+      } catch {
+        // ClusterRole to read nodes not granted; fall back to cluster-internal service URL
+      }
       await this.eventStore.append(
         makeEvent({
           traceId: aggregate.traceId,
@@ -279,17 +286,15 @@ export class PreviewsService {
     if (aggregate.status === 'destroyed') {
       throw new ConflictException(`preview env ${id} already destroyed`);
     }
-    if (aggregate.backend === 'k8s' && aggregate.pod) {
-      const ns = process.env.JACK_K8S_NAMESPACE || 'default';
-      await this.kubectl(['delete', 'pod', aggregate.pod, '-n', ns, '--ignore-not-found', '--wait=false']).catch(
-        () => undefined,
-      );
-      if (aggregate.service) {
-        await this.kubectl(['delete', 'svc', aggregate.service ?? `${aggregate.pod}-svc`, '-n', ns, '--ignore-not-found']).catch(
-          () => undefined,
-        );
-      }
-    } else if (aggregate.container) {
+    const derivedPod = `jack-preview-pr${aggregate.prNumber}-${id.slice(-8)}`.toLowerCase();
+    const ns = process.env.JACK_K8S_NAMESPACE || 'default';
+    await this.kubectl(['delete', 'pod', derivedPod, '-n', ns, '--ignore-not-found', '--wait=false']).catch(
+      () => undefined,
+    );
+    await this.kubectl([
+      'delete', 'svc', aggregate.service ?? `${derivedPod}-svc`, '-n', ns, '--ignore-not-found',
+    ]).catch(() => undefined);
+    if (aggregate.container) {
       await execAsync(`docker rm -f ${aggregate.container}`, { windowsHide: true }).catch(() => undefined);
     }
     await this.eventStore.append(

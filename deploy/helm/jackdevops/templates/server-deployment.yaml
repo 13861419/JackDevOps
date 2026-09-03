@@ -16,6 +16,7 @@ spec:
         {{- include "jackdevops.labels" . | nindent 8 }}
         app.kubernetes.io/component: server
     spec:
+      serviceAccountName: {{ include "jackdevops.name" . }}-server
       containers:
         - name: server
           image: "{{ .Values.image.server }}:{{ .Values.image.tag }}"

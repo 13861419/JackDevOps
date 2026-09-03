@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "jackdevops.name" . }}-server
+  labels:
+    {{- include "jackdevops.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "jackdevops.name" . }}-preview
+  labels:
+    {{- include "jackdevops.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["create", "get", "list", "delete"]
+  - apiGroups: [""]
+    verbs: ["create", "get", "list", "delete"]
+    resources: ["services"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "jackdevops.name" . }}-preview-runner
+  labels:
+    {{- include "jackdevops.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "jackdevops.name" . }}-preview
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "jackdevops.name" . }}-server
+    namespace: {{ .Release.Namespace }}
