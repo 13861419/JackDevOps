@@ -19,6 +19,8 @@ export interface DomainEvent<T = Record<string, unknown>> {
   occurredAt: string;
   /** Optional tenant scope (F2 multi-tenancy Phase 1); absent = global/legacy event */
   tenantId?: string;
+  /** Monotonic per-aggregate version, assigned by the store on append */
+  aggregateVersion?: number;
 }
 
 export const AGGREGATE = {

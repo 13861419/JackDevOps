@@ -356,12 +356,16 @@ export class PreviewsService {
   }
 
   private async load(id: string): Promise<PreviewEnvAggregate | null> {
+    const snapshot = await this.eventStore.loadSnapshot(AGGREGATE.previewEnv, id);
     const events = await this.eventStore.listByAggregate(AGGREGATE.previewEnv, id);
     if (events.length === 0) {
       return null;
     }
-    let aggregate: PreviewEnvAggregate | null = null;
-    for (const event of events) {
+    const fromVersion = snapshot?.version ?? 0;
+    const pending = events.filter((e) => (e.aggregateVersion ?? 0) > fromVersion);
+    let aggregate: PreviewEnvAggregate | null =
+      (snapshot?.state as PreviewEnvAggregate | null) ?? null;
+    for (const event of pending) {
       if (event.type === EVENT.previewEnvRequested) {
         aggregate = {
           traceId: event.traceId,
@@ -388,6 +392,13 @@ export class PreviewsService {
         aggregate.status = 'destroyed';
         aggregate.destroyedAt = event.occurredAt;
       }
+    }
+    if (!aggregate) {
+      return null;
+    }
+    const lastVersion = events[events.length - 1]?.aggregateVersion ?? 0;
+    if (lastVersion - fromVersion >= 20) {
+      await this.eventStore.saveSnapshot(AGGREGATE.previewEnv, id, lastVersion, aggregate);
     }
     return aggregate;
   }

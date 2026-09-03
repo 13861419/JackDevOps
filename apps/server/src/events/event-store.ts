@@ -14,6 +14,22 @@ export interface EventStore {
   ): Promise<DomainEvent[]>;
   listByType(type: string, opts?: ListEventsOptions): Promise<DomainEvent[]>;
   listAll(limit?: number, offset?: number, opts?: ListEventsOptions): Promise<DomainEvent[]>;
+  /** Persist a projection snapshot; callers replay only events with aggregateVersion > snapshot.version */
+  saveSnapshot(
+    aggregateType: string,
+    aggregateId: string,
+    lastVersion: number,
+    state: unknown,
+  ): Promise<void>;
+  loadSnapshot(
+    aggregateType: string,
+    aggregateId: string,
+  ): Promise<{ version: number; state: unknown } | null>;
+}
+
+export interface AggregateSnapshot {
+  version: number;
+  state: unknown;
 }
 
 function matchesTenant(event: DomainEvent, opts?: ListEventsOptions): boolean {
@@ -25,12 +41,31 @@ function matchesTenant(event: DomainEvent, opts?: ListEventsOptions): boolean {
 
 export class InMemoryEventStore implements EventStore {
   private readonly events: DomainEvent[] = [];
+  private readonly versions = new Map<string, number>();
+  private readonly snapshots = new Map<string, AggregateSnapshot>();
 
   constructor(private readonly bus?: { publish(event: DomainEvent): void }) {}
 
   async append(event: DomainEvent): Promise<void> {
+    const key = `${event.aggregateType}:${event.aggregateId}`;
+    const version = (this.versions.get(key) ?? 0) + 1;
+    this.versions.set(key, version);
+    event.aggregateVersion = version;
     this.events.push(event);
     this.bus?.publish(event);
+  }
+
+  async saveSnapshot(
+    aggregateType: string,
+    aggregateId: string,
+    lastVersion: number,
+    state: unknown,
+  ): Promise<void> {
+    this.snapshots.set(`${aggregateType}:${aggregateId}`, { version: lastVersion, state });
+  }
+
+  async loadSnapshot(aggregateType: string, aggregateId: string): Promise<AggregateSnapshot | null> {
+    return this.snapshots.get(`${aggregateType}:${aggregateId}`) ?? null;
   }
 
   async listByTrace(traceId: string, opts?: ListEventsOptions): Promise<DomainEvent[]> {

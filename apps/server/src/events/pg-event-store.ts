@@ -4,7 +4,7 @@ import { sql, and, eq } from 'drizzle-orm';
 import { pgTable, bigserial, varchar, integer, jsonb, timestamp, uuid, index } from 'drizzle-orm/pg-core';
 import { Pool } from 'pg';
 import type { DomainEvent } from './domain-event';
-import type { EventStore, ListEventsOptions } from './event-store';
+import type { EventStore, ListEventsOptions, AggregateSnapshot } from './event-store';
 
 const domainEvents = pgTable(
   'domain_events',
@@ -91,28 +91,67 @@ export class PgEventStore implements EventStore, OnModuleInit {
     await this.db.execute(
       sql`CREATE INDEX IF NOT EXISTS idx_domain_events_tenant ON domain_events (tenant_id)`,
     );
+    await this.db.execute(sql`
+      CREATE TABLE IF NOT EXISTS aggregate_snapshots (
+        aggregate_type VARCHAR(32) NOT NULL,
+        aggregate_id VARCHAR(64) NOT NULL,
+        last_version INTEGER NOT NULL,
+        state JSONB NOT NULL,
+        PRIMARY KEY (aggregate_type, aggregate_id)
+      )
+    `);
     this.logger.log('domain_events table ready');
   }
 
   async append(event: DomainEvent): Promise<void> {
-    await this.db.insert(domainEvents).values({
-      eventId: event.eventId,
-      traceId: event.traceId,
-      type: event.type,
-      schemaVersion: event.schemaVersion,
-      aggregateType: event.aggregateType,
-      aggregateId: event.aggregateId,
-      actorType: event.actor.type,
-      actorId: event.actor.id,
-      payload: event.payload,
-      occurredAt: event.occurredAt,
-      aggregateVersion: sql`
-        (SELECT COALESCE(MAX(aggregate_version), 0) + 1 FROM domain_events
-         WHERE aggregate_type = ${event.aggregateType} AND aggregate_id = ${event.aggregateId})
-      `,
-      tenantId: event.tenantId ?? null,
-    });
+    const [row] = await this.db
+      .insert(domainEvents)
+      .values({
+        eventId: event.eventId,
+        traceId: event.traceId,
+        type: event.type,
+        schemaVersion: event.schemaVersion,
+        aggregateType: event.aggregateType,
+        aggregateId: event.aggregateId,
+        actorType: event.actor.type,
+        actorId: event.actor.id,
+        payload: event.payload,
+        occurredAt: event.occurredAt,
+        aggregateVersion: sql`
+          (SELECT COALESCE(MAX(aggregate_version), 0) + 1 FROM domain_events
+           WHERE aggregate_type = ${event.aggregateType} AND aggregate_id = ${event.aggregateId})
+        `,
+        tenantId: event.tenantId ?? null,
+      })
+      .returning({ aggregateVersion: domainEvents.aggregateVersion });
+    event.aggregateVersion = row.aggregateVersion;
     this.bus?.publish(event);
+  }
+
+  async saveSnapshot(
+    aggregateType: string,
+    aggregateId: string,
+    lastVersion: number,
+    state: unknown,
+  ): Promise<void> {
+    await this.db.execute(sql`
+      INSERT INTO aggregate_snapshots (aggregate_type, aggregate_id, last_version, state)
+      VALUES (${aggregateType}, ${aggregateId}, ${lastVersion}, ${JSON.stringify(state)}::jsonb)
+      ON CONFLICT (aggregate_type, aggregate_id)
+      DO UPDATE SET last_version = ${lastVersion}, state = ${JSON.stringify(state)}::jsonb
+    `);
+  }
+
+  async loadSnapshot(aggregateType: string, aggregateId: string): Promise<AggregateSnapshot | null> {
+    const result = await this.db.execute<{ last_version: number; state: unknown }>(sql`
+      SELECT last_version, state FROM aggregate_snapshots
+      WHERE aggregate_type = ${aggregateType} AND aggregate_id = ${aggregateId}
+    `);
+    const row = result.rows[0];
+    if (!row) {
+      return null;
+    }
+    return { version: Number(row.last_version), state: row.state };
   }
 
   private mapRow(row: typeof domainEvents.$inferSelect): DomainEvent {
