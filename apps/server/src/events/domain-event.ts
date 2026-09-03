@@ -1,3 +1,5 @@
+import { currentTenantId } from './tenant-context';
+
 export type ActorType = 'user' | 'agent' | 'system';
 
 export interface Actor {
@@ -89,6 +91,7 @@ export function makeEvent<T extends Record<string, unknown>>(
   return {
     schemaVersion: 1,
     ...input,
+    tenantId: input.tenantId ?? currentTenantId(),
     eventId: newId('evt'),
     occurredAt: new Date().toISOString(),
   } as DomainEvent<T>;

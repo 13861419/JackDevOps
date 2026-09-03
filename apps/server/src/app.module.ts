@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { EventsModule } from './events';
 import { AuthModule } from './modules/auth/auth.module';
+import { TenantInterceptor } from './modules/auth/tenant.interceptor';
 import { WorkItemsModule } from './modules/workitems/workitems.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { WorkflowsModule } from './modules/workflows/workflows.module';
@@ -51,5 +53,6 @@ import { MarketModule } from './modules/market/market.module';
     DemoModule,
     MarketModule,
   ],
+  providers: [{ provide: APP_INTERCEPTOR, useClass: TenantInterceptor }],
 })
 export class AppModule {}

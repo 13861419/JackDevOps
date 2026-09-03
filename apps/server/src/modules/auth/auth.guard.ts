@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 export interface AuthUser {
   id: string;
   role: 'admin' | 'pm' | 'dev' | 'qa' | 'ops';
+  tenantId?: string;
 }
 
 export const IS_PUBLIC_KEY = 'isPublic';
@@ -30,13 +31,13 @@ export class AuthGuard implements CanActivate {
     private readonly sessions: AuthService,
   ) {
     const adminToken = process.env.JACK_ADMIN_TOKEN ?? 'dev-admin-token';
-    this.users.set(adminToken, { id: 'admin', role: 'admin' });
+    this.users.set(adminToken, { id: 'admin', role: 'admin', tenantId: 'default' });
     const extra = process.env.JACK_USERS;
     if (extra) {
       try {
-        const parsed = JSON.parse(extra) as Record<string, { id: string; role: AuthUser['role'] }>;
+        const parsed = JSON.parse(extra) as Record<string, { id: string; role: AuthUser['role']; tenantId?: string }>;
         for (const [token, user] of Object.entries(parsed)) {
-          this.users.set(token, user);
+          this.users.set(token, { tenantId: 'default', ...user });
         }
       } catch {
         console.warn('[auth] JACK_USERS is not valid JSON, ignoring extra users');
