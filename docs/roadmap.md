@@ -70,6 +70,7 @@
 - [x] F9-lite SLSA：promote 时落 `release.provenance_recorded` + `GET /releases/:id/provenance`
 - [x] M17 Git 状态回写：push 触发的 run 完成后回写 GitHub commit status（`JACK_GITHUB_TOKEN`，缺失优雅跳过）
 - [x] M17 D6 容器构建实测：docker build 上下文相对 Dockerfile 解析修复
+- [x] M18 B2 AI 代码评审：PR webhook 拉取 diff → 规则 + dsh AI 双评审 → 回写 `jackdevops/ai-review` status（实测真实 DeepSeek 评审）
 - [ ] 依赖真实 K8s 集群：D8 Preview pod 部署实测、F2 多租户、插件市场（模型已预留）
 
 ---
