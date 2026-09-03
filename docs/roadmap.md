@@ -76,7 +76,8 @@
 - [x] M20 F10 企业交付：Helm Chart（server/web/pg/redis 全套，lint+template 通过）
 - [x] M21 kind 集群实测：D8 Preview K8s 后端端到端验证（pod 部署/NodePort/确定性回收）
 - [x] M22 插件市场：内置目录 + 安装/卸载（事件溯源注水）、动态 Job 类型、fail-closed 400 校验
-- [ ] 依赖设计评审：F2 多租户 schema（改动横跨所有模块，需先评审）；PG 事件快照（量大后优化）
+- [x] M23-M24 F2 多租户：Phase 1 事件层租户隔离（tenant_id 列+过滤）；Phase 2 ALS 租户传播（makeEvent 自动标记，非 admin 审计强制本租户）；Phase 3（配额/分片）留待评审
+- [ ] PG 事件快照（量大后优化）
 
 ---
 
