@@ -29,9 +29,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build server & web
-        run: |
-          pnpm --filter @jackdevops/server build
-          pnpm --filter @jackdevops/web build
+        run: pnpm build
 
       - name: Stage server runtime (pnpm deploy)
         run: |
