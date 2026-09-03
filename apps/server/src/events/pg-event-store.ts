@@ -1,10 +1,10 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { drizzle, NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { sql } from 'drizzle-orm';
+import { sql, and, eq } from 'drizzle-orm';
 import { pgTable, bigserial, varchar, integer, jsonb, timestamp, uuid, index } from 'drizzle-orm/pg-core';
 import { Pool } from 'pg';
 import type { DomainEvent } from './domain-event';
-import type { EventStore } from './event-store';
+import type { EventStore, ListEventsOptions } from './event-store';
 
 const domainEvents = pgTable(
   'domain_events',
@@ -21,11 +21,13 @@ const domainEvents = pgTable(
     payload: jsonb('payload').notNull(),
     occurredAt: varchar('occurred_at', { length: 64 }).notNull(),
     aggregateVersion: integer('aggregate_version').notNull().default(1),
+    tenantId: varchar('tenant_id', { length: 64 }),
   },
   (t) => [
     index('idx_domain_events_trace').on(t.traceId),
     index('idx_domain_events_aggregate').on(t.aggregateType, t.aggregateId),
     index('idx_domain_events_type').on(t.type),
+    index('idx_domain_events_tenant').on(t.tenantId),
   ],
 );
 
@@ -83,6 +85,12 @@ export class PgEventStore implements EventStore, OnModuleInit {
       CREATE UNIQUE INDEX IF NOT EXISTS uq_domain_events_aggregate_version
       ON domain_events (aggregate_type, aggregate_id, aggregate_version)
     `);
+    await this.db.execute(sql`
+      ALTER TABLE domain_events ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(64)
+    `);
+    await this.db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_domain_events_tenant ON domain_events (tenant_id)`,
+    );
     this.logger.log('domain_events table ready');
   }
 
@@ -102,6 +110,7 @@ export class PgEventStore implements EventStore, OnModuleInit {
         (SELECT COALESCE(MAX(aggregate_version), 0) + 1 FROM domain_events
          WHERE aggregate_type = ${event.aggregateType} AND aggregate_id = ${event.aggregateId})
       `,
+      tenantId: event.tenantId ?? null,
     });
     this.bus?.publish(event);
   }
@@ -117,40 +126,66 @@ export class PgEventStore implements EventStore, OnModuleInit {
       actor: { type: row.actorType as DomainEvent['actor']['type'], id: row.actorId },
       payload: row.payload as DomainEvent['payload'],
       occurredAt: row.occurredAt,
+      tenantId: row.tenantId ?? undefined,
     };
   }
 
-  async listByTrace(traceId: string): Promise<DomainEvent[]> {
+  async listByTrace(traceId: string, opts?: ListEventsOptions): Promise<DomainEvent[]> {
     const rows = await this.db
       .select()
       .from(domainEvents)
-      .where(sql`${domainEvents.traceId} = ${traceId}`)
+      .where(
+        and(
+          eq(domainEvents.traceId, traceId),
+          ...(opts?.tenantId ? [eq(domainEvents.tenantId, opts.tenantId)] : []),
+        ),
+      )
       .orderBy(domainEvents.seq);
     return rows.map((r) => this.mapRow(r));
   }
 
-  async listByAggregate(aggregateType: string, aggregateId: string): Promise<DomainEvent[]> {
+  async listByAggregate(
+    aggregateType: string,
+    aggregateId: string,
+    opts?: ListEventsOptions,
+  ): Promise<DomainEvent[]> {
     const rows = await this.db
       .select()
       .from(domainEvents)
-      .where(sql`${domainEvents.aggregateType} = ${aggregateType} AND ${domainEvents.aggregateId} = ${aggregateId}`)
+      .where(
+        and(
+          eq(domainEvents.aggregateType, aggregateType),
+          eq(domainEvents.aggregateId, aggregateId),
+          ...(opts?.tenantId ? [eq(domainEvents.tenantId, opts.tenantId)] : []),
+        ),
+      )
       .orderBy(domainEvents.seq);
     return rows.map((r) => this.mapRow(r));
   }
 
-  async listByType(type: string): Promise<DomainEvent[]> {
+  async listByType(type: string, opts?: ListEventsOptions): Promise<DomainEvent[]> {
     const rows = await this.db
       .select()
       .from(domainEvents)
-      .where(sql`${domainEvents.type} = ${type}`)
+      .where(
+        and(
+          eq(domainEvents.type, type),
+          ...(opts?.tenantId ? [eq(domainEvents.tenantId, opts.tenantId)] : []),
+        ),
+      )
       .orderBy(domainEvents.seq);
     return rows.map((r) => this.mapRow(r));
   }
 
-  async listAll(limit = 100, offset = 0): Promise<DomainEvent[]> {
+  async listAll(limit = 100, offset = 0, opts?: ListEventsOptions): Promise<DomainEvent[]> {
     const rows = await this.db
       .select()
       .from(domainEvents)
+      .where(
+        and(
+          ...(opts?.tenantId ? [eq(domainEvents.tenantId, opts.tenantId)] : []),
+        ),
+      )
       .orderBy(sql`${domainEvents.seq} DESC`)
       .limit(limit)
       .offset(offset);

@@ -15,6 +15,8 @@ export interface DomainEvent<T = Record<string, unknown>> {
   actor: Actor;
   payload: T;
   occurredAt: string;
+  /** Optional tenant scope (F2 multi-tenancy Phase 1); absent = global/legacy event */
+  tenantId?: string;
 }
 
 export const AGGREGATE = {
