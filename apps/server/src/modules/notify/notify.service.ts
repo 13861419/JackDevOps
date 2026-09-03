@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
+  buildApprovalCard,
   buildPayload,
   formatRunCompleted,
+  type ApprovalCardInput,
   type NotifyProvider,
 } from './notify.payloads';
 import type { RunView } from '../workflows/workflow-runs.service';
@@ -12,10 +14,33 @@ export interface GitStatusResult {
   note?: string;
 }
 
+export interface NotifyResult {
+  sent: boolean;
+  note?: string;
+}
+
 @Injectable()
 export class NotifyService {
   private readonly configured =
     Boolean(process.env.NOTIFY_WEBHOOK_URL) && Boolean(process.env.NOTIFY_PROVIDER);
+
+  async approvalRequested(input: ApprovalCardInput): Promise<NotifyResult> {
+    if (!this.configured) {
+      return { sent: false, note: 'IM notify not configured; approval card skipped' };
+    }
+    const provider = (process.env.NOTIFY_PROVIDER ?? 'slack') as NotifyProvider;
+    const url = process.env.NOTIFY_WEBHOOK_URL as string;
+    try {
+      await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(buildApprovalCard(provider, input)),
+      });
+      return { sent: true };
+    } catch (err) {
+      return { sent: false, note: `approval card failed: ${String(err).slice(0, 120)}` };
+    }
+  }
 
   async runCompleted(run: RunView, workflowName: string): Promise<void> {
     if (this.configured) {

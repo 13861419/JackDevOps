@@ -2,6 +2,7 @@ import { ConflictException, Inject, Injectable, NotFoundException, Optional } fr
 import { AGGREGATE, EVENT, makeEvent, newId } from '../../events';
 import { EVENT_STORE, type EventStore, type DomainEvent } from '../../events';
 import { LlmService } from '../ai/llm.service';
+import { NotifyService } from '../notify/notify.service';
 import { defaultSteps, type ReleaseStep, type ReleaseStrategyType } from './release.types';
 
 export interface ReleaseApproval {
@@ -46,6 +47,7 @@ interface ReleaseAggregate {
 export class ReleasesService {
   constructor(
     @Inject(EVENT_STORE) private readonly eventStore: EventStore,
+    @Optional() private readonly notify?: NotifyService,
     @Optional() private readonly llm?: LlmService,
   ) {}
 
@@ -93,8 +95,24 @@ export class ReleasesService {
     if (!view) {
       throw new ConflictException(`release ${id} projection failed`);
     }
+    if (strategy !== 'rolling' && this.notify) {
+      try {
+        const card = await this.notify.approvalRequested({
+          releaseId: id,
+          version: input.version,
+          strategy,
+          consoleUrl: `${process.env.JACK_BASE_URL ?? 'http://localhost:5173'}/#/releases`,
+          actorId: input.actorId,
+        });
+        if (!card.sent && card.note) {
+          console.warn(`[notify] approval card skipped: ${card.note}`);
+        }
+      } catch (err) {
+        console.warn(`[notify] approval card failed: ${String(err)}`);
+      }
+    }
     return view;
-  }
+    }
 
   async approve(
     id: string,
