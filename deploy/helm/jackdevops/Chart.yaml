@@ -2,8 +2,8 @@ apiVersion: v2
 name: jackdevops
 description: JackDevOps - AI-ready open source DevOps platform (event-sourced, requirements to operations)
 type: application
-version: 0.1.0
-appVersion: "v0.1.0"
+version: 0.2.0
+appVersion: "v0.2.0"
 keywords:
   - devops
   - ci-cd
