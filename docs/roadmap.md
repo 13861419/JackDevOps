@@ -73,7 +73,10 @@
 - [x] M18 B2 AI 代码评审：PR webhook 拉取 diff → 规则 + dsh AI 双评审 → 回写 `jackdevops/ai-review` status（实测真实 DeepSeek 评审）
 - [x] M19 A4 完整版：审批 IM 卡片（钉钉 actionCard/飞书 interactive/企微 markdown/Slack）
 - [x] M20 F10 企业交付：Helm Chart（server/web/pg/redis 全套，lint+template 通过）
-- [ ] 依赖真实 K8s 集群：D8 Preview pod 部署实测、F2 多租户、插件市场（模型已预留）
+- [x] M20 F10 企业交付：Helm Chart（server/web/pg/redis 全套，lint+template 通过）
+- [x] M21 kind 集群实测：D8 Preview K8s 后端端到端验证（pod 部署/NodePort/确定性回收）
+- [x] M22 插件市场：内置目录 + 安装/卸载（事件溯源注水）、动态 Job 类型、fail-closed 400 校验
+- [ ] 依赖设计评审：F2 多租户 schema（改动横跨所有模块，需先评审）；PG 事件快照（量大后优化）
 
 ---
 
