@@ -63,6 +63,10 @@ export class JobRegistry {
     this.handlers.set(handler.type, handler);
   }
 
+  unregister(type: JobType): void {
+    this.handlers.delete(type);
+  }
+
   get(type: JobType): JobHandler {
     const handler = this.handlers.get(type);
     if (!handler) {

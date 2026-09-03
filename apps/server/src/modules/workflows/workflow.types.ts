@@ -1,4 +1,5 @@
-export type JobType = 'build' | 'test' | 'scan' | 'deploy' | 'agent' | 'container-build';
+export type BuiltinJobType = 'build' | 'test' | 'scan' | 'deploy' | 'agent' | 'container-build';
+export type JobType = BuiltinJobType | (string & {});
 
 export interface JobSpec {
   id: string;

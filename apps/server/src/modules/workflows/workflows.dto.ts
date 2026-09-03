@@ -2,7 +2,9 @@ import { z } from 'zod';
 
 export const jobSpecDto = z.object({
   id: z.string().min(1).max(64),
-  type: z.enum(['build', 'test', 'scan', 'deploy', 'agent', 'container-build']),
+  // Dynamic plugin types are allowed; unknown types are rejected by
+  // validateSpecDag against the live JobRegistry at creation time.
+  type: z.string().min(1).max(64),
   dependsOn: z.array(z.string().max(64)).max(32).optional(),
   config: z.record(z.string(), z.unknown()).optional(),
 });

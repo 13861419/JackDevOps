@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable } from '@nestjs/common';
 import { AGGREGATE, EVENT, makeEvent, newChangeTraceId, newId } from '../../events';
 import { EVENT_STORE, type EventStore } from '../../events';
 import { JobRegistry } from './job-registry';
@@ -17,7 +17,13 @@ export class WorkflowsService {
     serviceId?: string;
     actorId: string;
   }): Promise<WorkflowView> {
-    validateSpecDag(input.spec, this.jobRegistry.types());
+    try {
+      validateSpecDag(input.spec, this.jobRegistry.types());
+    } catch (err) {
+      throw new BadRequestException(
+        `invalid workflow spec: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
     const id = newId('wf');
     const event = makeEvent({
       traceId: newChangeTraceId(),

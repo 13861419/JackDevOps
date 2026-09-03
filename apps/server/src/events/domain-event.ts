@@ -29,9 +29,10 @@ export const AGGREGATE = {
   flag: 'flag',
   testSuite: 'testsuite',
   testRun: 'testrun',
-  previewEnv: 'previewenv',
-  doc: 'doc',
-} as const;
+    previewEnv: 'previewenv',
+    doc: 'doc',
+    plugin: 'plugin',
+  } as const;
 
 export const EVENT = {
   workItemCreated: 'workitem.created',
@@ -60,6 +61,8 @@ export const EVENT = {
   previewEnvRequested: 'previewenv.requested',
   previewEnvReady: 'previewenv.ready',
   previewEnvDestroyed: 'previewenv.destroyed',
+  marketPluginInstalled: 'market.plugin_installed',
+  marketPluginUninstalled: 'market.plugin_uninstalled',
   docUpdated: 'doc.updated',
   driftDetected: 'drift.detected',
   driftReconciled: 'drift.reconciled',

@@ -22,6 +22,7 @@ import { DriftModule } from './modules/drift/drift.module';
 import { SecretsModule } from './modules/secrets/secrets.module';
 import { DemoModule } from './modules/demo/demo.module';
 import { RunQueueModule } from './modules/runqueue/runqueue.module';
+import { MarketModule } from './modules/market/market.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { RunQueueModule } from './modules/runqueue/runqueue.module';
     DriftModule,
     SecretsModule,
     DemoModule,
+    MarketModule,
   ],
 })
 export class AppModule {}
