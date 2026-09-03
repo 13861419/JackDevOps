@@ -3,6 +3,7 @@ export interface ReviewPRInput {
   description?: string;
   files: { path: string; additions: number; deletions: number }[];
   serviceId?: string;
+  diff?: string;
 }
 
 export type Severity = 'fail' | 'warn';
@@ -78,4 +79,32 @@ export function runRules(pr: ReviewPRInput, rules: PRRule[] = REVIEW_RULES): {
       ? 'warn'
       : 'pass';
   return { verdict, findings };
+}
+
+export function parseDiffToFiles(diff: string): { path: string; additions: number; deletions: number }[] {
+  const files = new Map<string, { additions: number; deletions: number }>();
+  let current: string | null = null;
+  for (const line of diff.split(/\r?\n/)) {
+    const m = /^diff --git a\/(.+?) b\/(.+)$/.exec(line);
+    if (m) {
+      current = m[2];
+      if (!files.has(current)) {
+        files.set(current, { additions: 0, deletions: 0 });
+      }
+      continue;
+    }
+    if (!current || line.startsWith('+++') || line.startsWith('---')) {
+      continue;
+    }
+    const entry = files.get(current);
+    if (!entry) {
+      continue;
+    }
+    if (line.startsWith('+')) {
+      entry.additions += 1;
+    } else if (line.startsWith('-')) {
+      entry.deletions += 1;
+    }
+  }
+  return [...files.entries()].map(([path, c]) => ({ path, ...c }));
 }

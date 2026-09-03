@@ -42,18 +42,28 @@ export class NotifyService {
   }
 
   async postCommitStatus(run: RunView, workflowName: string): Promise<GitStatusResult> {
-    const token = process.env.JACK_GITHUB_TOKEN;
-    if (!token) {
-      return { sent: false, note: 'JACK_GITHUB_TOKEN not set; commit status skipped' };
-    }
     const sha = run.meta?.commit;
     const repo = run.meta?.repoUrl;
     if (!sha || !repo) {
       return { sent: false, note: 'run meta missing commit or repository; commit status skipped' };
     }
-    const api = process.env.JACK_GITHUB_API ?? 'https://api.github.com';
     const state =
       run.status === 'succeeded' ? 'success' : run.status === 'failed' ? 'failure' : 'pending';
+    return this.postStatus(repo, sha, state, 'jackdevops/pipeline', `${workflowName} ${run.status}`);
+  }
+
+  async postStatus(
+    repo: string,
+    sha: string,
+    state: 'success' | 'failure' | 'pending',
+    context: string,
+    description: string,
+  ): Promise<GitStatusResult> {
+    const token = process.env.JACK_GITHUB_TOKEN;
+    if (!token) {
+      return { sent: false, note: 'JACK_GITHUB_TOKEN not set; commit status skipped' };
+    }
+    const api = process.env.JACK_GITHUB_API ?? 'https://api.github.com';
     try {
       const res = await fetch(`${api}/repos/${repo}/statuses/${sha}`, {
         method: 'POST',
@@ -64,8 +74,8 @@ export class NotifyService {
         },
         body: JSON.stringify({
           state,
-          context: 'jackdevops/pipeline',
-          description: `${workflowName} ${run.status}`.slice(0, 100),
+          context,
+          description: description.slice(0, 100),
         }),
       });
       if (!res.ok) {

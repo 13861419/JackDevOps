@@ -103,7 +103,7 @@ export async function hasBinary(binary: string): Promise<boolean> {
   }
 }
 
-function runDshAgent(
+export function runDshAgent(
   task: string,
   cwd: string | undefined,
   timeoutMs: number,

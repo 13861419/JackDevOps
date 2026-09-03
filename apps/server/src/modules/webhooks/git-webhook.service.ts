@@ -1,8 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { CatalogService } from '../catalog/catalog.service';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { WorkflowRunsService } from '../workflows/workflow-runs.service';
 import { PreviewsService } from '../previews/previews.service';
+import { ReviewService } from '../review/review.service';
+import { parseDiffToFiles } from '../review/review.rules';
 import type { PreviewEnvView } from '../previews/preview.types';
 import type { RunMeta } from '../workflows/workflow.types';
 
@@ -21,8 +23,11 @@ interface GitPrPayload {
   pull_request?: {
     number?: number;
     title?: string;
+    body?: string;
     head?: { ref?: string; sha?: string };
+    diff_url?: string;
   };
+  repository?: { full_name?: string; html_url?: string };
 }
 
 interface TriggeredRun {
@@ -31,6 +36,8 @@ interface TriggeredRun {
   runId: string;
 }
 
+const DIFF_LIMIT = 100_000;
+
 @Injectable()
 export class GitWebhookService {
   constructor(
@@ -38,6 +45,7 @@ export class GitWebhookService {
     private readonly workflows: WorkflowsService,
     private readonly runs: WorkflowRunsService,
     private readonly previews: PreviewsService,
+    @Optional() private readonly review?: ReviewService,
   ) {}
 
   async handlePush(slug: string, body: GitPushPayload): Promise<{ triggered: TriggeredRun[] }> {
@@ -81,7 +89,57 @@ export class GitWebhookService {
       commit: body.pull_request?.head?.sha,
       actorId: 'webhook',
     });
-    return { action, preview };
+    const aiReview = await this.runAiReview(slug, body, prNumber);
+    return { action, preview, ...(aiReview ? { review: aiReview } : {}) };
+  }
+
+  private async runAiReview(
+    slug: string,
+    body: GitPrPayload,
+    prNumber: number,
+  ): Promise<{ verdict: string; findings: unknown[]; aiSummary?: string; aiNote?: string } | null> {
+    if (!this.review) {
+      return null;
+    }
+    const diffUrl = body.pull_request?.diff_url;
+    if (!diffUrl) {
+      return null;
+    }
+    let diff = '';
+    try {
+      const headers: Record<string, string> = { accept: 'application/vnd.github.v3.diff' };
+      if (process.env.JACK_GITHUB_TOKEN) {
+        headers.authorization = `Bearer ${process.env.JACK_GITHUB_TOKEN}`;
+      }
+      const res = await fetch(diffUrl, { headers });
+      if (!res.ok) {
+        return { verdict: 'pass', findings: [], aiNote: `diff fetch failed with ${res.status}; AI review skipped` };
+      }
+      diff = (await res.text()).slice(0, DIFF_LIMIT);
+    } catch (err) {
+      return { verdict: 'pass', findings: [], aiNote: `diff fetch failed: ${String(err).slice(0, 120)}` };
+    }
+    const result = await this.review.reviewPullRequest(
+      {
+        title: body.pull_request?.title ?? `PR #${prNumber}`,
+        description: body.pull_request?.body,
+        serviceId: slug,
+        files: parseDiffToFiles(diff),
+        diff,
+      },
+      'webhook:pr',
+    );
+    await this.review.writebackReviewStatus({
+      repo: body.repository?.full_name,
+      sha: body.pull_request?.head?.sha,
+      verdict: result.verdict,
+    });
+    return {
+      verdict: result.verdict,
+      findings: result.findings,
+      ...(result.aiSummary ? { aiSummary: result.aiSummary } : {}),
+      ...(result.aiNote ? { aiNote: result.aiNote } : {}),
+    };
   }
 }
 
