@@ -5,3 +5,8 @@ packages:
 allowBuilds:
   esbuild: true
   msgpackr-extract: true
+  "@deepseek-ai/dsh-subprocess-local": true
+  "@google/genai": true
+  koffi: true
+  node-pty: true
+  protobufjs: true

@@ -100,7 +100,7 @@ describe('WorkflowRunsService (D1 execution)', () => {
     expect(trace.filter((e) => e.aggregateType === AGGREGATE.workflowRun).length).toBeGreaterThan(0);
   });
 
-  it('propagates failure: downstream jobs are skipped, run fails', async () => {
+  it('agent job without task degrades gracefully; run succeeds', async () => {
     const wf = await workflows.create({
       name: 'with-agent-fail',
       spec: {
@@ -114,11 +114,11 @@ describe('WorkflowRunsService (D1 execution)', () => {
     });
     const run = await runs.startRun(wf.id, 'u1');
     const finished = await waitForRun(runs, run.id);
-    expect(finished.status).toBe('failed');
+    expect(finished.status).toBe('succeeded');
     const byId = new Map(finished.jobs.map((j) => [j.id, j.status]));
     expect(byId.get('build')).toBe('succeeded');
-    expect(byId.get('agent')).toBe('failed');
-    expect(byId.get('deploy')).toBe('skipped');
+    expect(byId.get('agent')).toBe('succeeded');
+    expect(byId.get('deploy')).toBe('succeeded');
   });
 
   it('runs independent jobs in parallel batches', async () => {

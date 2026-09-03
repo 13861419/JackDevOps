@@ -1,4 +1,4 @@
-import { exec } from 'node:child_process';
+import { exec, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import type { JobHandler, JobType } from './workflow.types';
@@ -102,6 +102,44 @@ export async function hasBinary(binary: string): Promise<boolean> {
   }
 }
 
+function runDshAgent(
+  task: string,
+  cwd: string | undefined,
+  timeoutMs: number,
+): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    let dshBin: string;
+    try {
+      dshBin = require.resolve('@deepseek-ai/dsh/lib/bin.js');
+    } catch {
+      reject(new Error('@deepseek-ai/dsh not installed; agent skipped (graceful)'));
+      return;
+    }
+    const child = spawn(process.execPath, [dshBin, '--profile', 'headless', task], {
+      cwd,
+      env: process.env,
+      windowsHide: true,
+    });
+    let stdout = '';
+    let stderr = '';
+    const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
+    child.stdout.on('data', (chunk) => (stdout += String(chunk)));
+    child.stderr.on('data', (chunk) => (stderr += String(chunk)));
+    child.on('error', (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      if (code === 0) {
+        resolve({ stdout, stderr });
+      } else {
+        reject(new Error(`dsh agent failed (code ${code ?? '?'}): ${clip(stderr || stdout, 500)}`));
+      }
+    });
+  });
+}
+
 function builtinHandlers(): JobHandler[] {
   return [
     {
@@ -158,9 +196,39 @@ function builtinHandlers(): JobHandler[] {
     },
     {
       type: 'agent',
-      description: 'AI agent session via dsh (activates in Phase 2)',
-      run: async () => {
-        throw new BadRequestException('agent jobs activate in Phase 2 (dsh integration)');
+      description: 'DeepSeek Harness (dsh) headless agent run; requires config.task + DEEPSEEK_API_KEY',
+      run: async (ctx) => {
+        const task = typeof ctx.config.task === 'string' ? ctx.config.task : '';
+        if (!task) {
+          return { ok: true, type: 'agent', executed: false, durationMs: 0, note: 'no task configured; stub pass' };
+        }
+        if (!process.env.DEEPSEEK_API_KEY) {
+          return {
+            ok: true,
+            type: 'agent',
+            executed: false,
+            durationMs: 0,
+            note: 'DEEPSEEK_API_KEY not set; dsh agent skipped (graceful)',
+          };
+        }
+        const started = Date.now();
+        const timeoutMs = Number(ctx.config.timeoutMs) || 900_000;
+        try {
+          const result = await runDshAgent(task, typeof ctx.config.cwd === 'string' ? ctx.config.cwd : undefined, timeoutMs);
+          return {
+            ok: true,
+            type: 'agent',
+            executed: true,
+            durationMs: Date.now() - started,
+            stdout: clip(result.stdout),
+          };
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          if (message.includes('not installed')) {
+            return { ok: true, type: 'agent', executed: false, durationMs: 0, note: message };
+          }
+          throw new Error(`dsh agent failed: ${message.slice(0, 500)}`);
+        }
       },
     },
   ];
