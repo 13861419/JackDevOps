@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "jackdevops.name" . }}-server
+  labels:
+    {{- include "jackdevops.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.serverPort }}
+      targetPort: {{ .Values.server.port }}
+      name: http
+  selector:
+    app.kubernetes.io/name: {{ include "jackdevops.name" . }}
+    app.kubernetes.io/component: server
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "jackdevops.name" . }}-web
+  labels:
+    {{- include "jackdevops.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.web.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "jackdevops.name" . }}
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "jackdevops.name" . }}
+        app.kubernetes.io/component: web
+    spec:
+      containers:
+        - name: web
+          image: "{{ .Values.image.web }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.web.port }}
+          resources:
+            {{- toYaml .Values.resources.web | nindent 12 }}

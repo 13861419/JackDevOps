@@ -26,3 +26,9 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      - name: Helm chart lint
+        run: |
+          curl -fsSL https://get.helm.sh/helm-v3.16.4-linux-amd64.tar.gz | tar xz
+          ./linux-amd64/helm lint deploy/helm/jackdevops
+          ./linux-amd64/helm template test deploy/helm/jackdevops >/dev/null

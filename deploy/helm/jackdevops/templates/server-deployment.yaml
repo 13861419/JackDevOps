@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "jackdevops.name" . }}-server
+  labels:
+    {{- include "jackdevops.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.server.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "jackdevops.name" . }}
+      app.kubernetes.io/component: server
+  template:
+    metadata:
+      labels:
+        {{- include "jackdevops.labels" . | nindent 8 }}
+        app.kubernetes.io/component: server
+    spec:
+      containers:
+        - name: server
+          image: "{{ .Values.image.server }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.server.port }}
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: {{ .Values.server.port | quote }}
+            - name: DATABASE_URL
+              value: postgres://{{ .Values.postgres.user }}:{{ .Values.postgres.password }}@{{ include "jackdevops.name" . }}-postgres:5432/{{ .Values.postgres.database }}
+            - name: REDIS_URL
+              value: redis://{{ include "jackdevops.name" . }}-redis:6379
+            - name: JACK_BASE_URL
+              value: {{ .Values.global.baseUrl | default (printf "http://%s" .Values.ingress.host) | quote }}
+            - name: JACK_PREVIEW_BACKEND
+              value: k8s
+            - name: JACK_K8S_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          envFrom:
+            - secretRef:
+                name: {{ include "jackdevops.name" . }}-secrets
+          readinessProbe:
+            httpGet:
+              path: /previews
+              port: {{ .Values.server.port }}
+              httpHeaders:
+                - name: Authorization
+                  value: Bearer {{ .Values.server.adminToken }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.server.port }}
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources.server | nindent 12 }}

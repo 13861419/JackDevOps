@@ -1,29 +1,67 @@
-replicaCount: 1
+# Default values for jackdevops chart.
+
+global:
+  baseUrl: ""
 
 image:
-  repository: ghcr.io/13861419/jackdevops-server
-  tag: latest
+  server: ghcr.io/13861419/jackdevops-server
+  web: ghcr.io/13861419/jackdevops-web
+  tag: v0.1.0
   pullPolicy: IfNotPresent
+
+server:
+  replicas: 1
+  port: 3000
+  # -- Admin bearer token (change in production!)
+  adminToken: dev-admin-token
+  # -- Optional: DEEPSEEK_API_KEY for AI agent job & AI PR review
+  deepseekApiKey: ""
+  # -- Optional: JACK_GITHUB_TOKEN enables commit status writeback & diff fetch
+  githubToken: ""
+  # -- Optional: IM notify (dingtalk|feishu|wecom|slack) + webhook URL
+  notifyProvider: ""
+  notifyWebhookUrl: ""
+  # -- Optional: extra user tokens, JSON map { "token": { "id": "u1", "role": "admin" } }
+  extraUsers: ""
+  env: {}
+
+web:
+  replicas: 1
+  port: 80
 
 service:
   type: ClusterIP
-  port: 3000
+  webPort: 80
+  serverPort: 3000
 
-env:
-  DATABASE_URL: postgresql://jackdevops:jackdevops@jackdevops-postgres:5432/jackdevops
-  JACK_ADMIN_TOKEN: change-me
-  # Optional AI configuration
-  JACK_LLM_BASE_URL: ""
-  JACK_LLM_API_KEY: ""
-  JACK_LLM_MODEL: deepseek-chat
-  # Optional IM notifications (slack|dingtalk|feishu|wecom)
-  NOTIFY_PROVIDER: ""
-  NOTIFY_WEBHOOK_URL: ""
+ingress:
+  enabled: false
+  className: nginx
+  host: jackdevops.local
+  tls: false
+
+postgres:
+  image: postgres:16-alpine
+  storage: 8Gi
+  database: jackdevops
+  user: jackdevops
+  password: jackdevops
+
+redis:
+  image: redis:7-alpine
 
 resources:
-  requests:
-    cpu: 100m
-    memory: 256Mi
-  limits:
-    cpu: 500m
-    memory: 512Mi
+  server:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+  web:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi

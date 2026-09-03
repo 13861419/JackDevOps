@@ -1,0 +1,37 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "jackdevops.name" . }}
+  labels:
+    {{- include "jackdevops.labels" . | nindent 4 }}
+  {{- if eq .Values.ingress.className "nginx" }}
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 20m
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "jackdevops.name" . }}-server
+                port:
+                  number: {{ .Values.service.serverPort }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "jackdevops.name" . }}-web
+                port:
+                  number: {{ .Values.service.webPort }}
+{{- end }}
