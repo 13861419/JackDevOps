@@ -19,3 +19,5 @@ coverage/
 # os
 .DS_Store
 Thumbs.db
+
+apps/web/e2e/screenshots/

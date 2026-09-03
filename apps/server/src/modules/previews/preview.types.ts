@@ -1,5 +1,7 @@
 export type PreviewEnvStatus = 'creating' | 'ready' | 'destroyed';
 
+export type PreviewBackend = 'docker' | 'k8s' | 'stub';
+
 export interface PreviewEnvView {
   id: string;
   traceId: string;
@@ -16,6 +18,9 @@ export interface PreviewEnvView {
   container?: string;
   port?: number;
   image?: string;
+  backend?: PreviewBackend;
+  pod?: string;
+  service?: string;
 }
 
 export function previewEnvName(prNumber: number): string {

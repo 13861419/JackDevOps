@@ -1,13 +1,20 @@
 import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
-import { exec } from 'node:child_process';
+import { exec, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { AGGREGATE, EVENT, makeEvent, newId, newChangeTraceId } from '../../events';
 import { EVENT_STORE, type EventStore } from '../../events';
 import { CatalogService } from '../catalog/catalog.service';
 import { hasBinary } from '../workflows/job-registry';
-import { previewEnvName, previewUrl, type PreviewEnvStatus, type PreviewEnvView } from './preview.types';
+import {
+  previewEnvName,
+  previewUrl,
+  type PreviewBackend,
+  type PreviewEnvStatus,
+  type PreviewEnvView,
+} from './preview.types';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 const DEFAULT_PREVIEW_IMAGE = 'busybox:latest';
 
 export interface DeployResult {
@@ -17,6 +24,7 @@ export interface DeployResult {
   container?: string;
   port?: number;
   image?: string;
+  backend?: PreviewBackend;
   note?: string;
 }
 
@@ -35,18 +43,46 @@ interface PreviewEnvAggregate {
   container?: string;
   port?: number;
   image?: string;
+  backend?: PreviewBackend;
+  pod?: string;
+  service?: string;
 }
 
 @Injectable()
 export class PreviewsService {
   private readonly dockerProbe: () => Promise<boolean>;
+  private readonly k8sProbe: () => Promise<boolean>;
 
   constructor(
     @Inject(EVENT_STORE) private readonly eventStore: EventStore,
     private readonly catalog: CatalogService,
     @Optional() dockerProbe?: () => Promise<boolean>,
+    @Optional() k8sProbe?: () => Promise<boolean>,
   ) {
     this.dockerProbe = dockerProbe ?? (() => hasBinary('docker'));
+    this.k8sProbe = k8sProbe ?? (() => hasBinary('kubectl'));
+  }
+
+  resolveBackend(explicit?: string): PreviewBackend | 'auto' {
+    const wanted = (explicit ?? process.env.JACK_PREVIEW_BACKEND ?? 'auto').toLowerCase();
+    if (wanted === 'docker' || wanted === 'k8s' || wanted === 'stub') {
+      return wanted;
+    }
+    return 'auto';
+  }
+
+  async pickBackend(): Promise<PreviewBackend> {
+    const wanted = this.resolveBackend();
+    if (wanted !== 'auto') {
+      return wanted;
+    }
+    if (await this.dockerProbe()) {
+      return 'docker';
+    }
+    if (await this.k8sProbe()) {
+      return 'k8s';
+    }
+    return 'stub';
   }
 
   async request(input: {
@@ -117,11 +153,22 @@ export class PreviewsService {
     if (aggregate.status === 'destroyed') {
       throw new ConflictException(`preview env ${id} already destroyed`);
     }
-    if (!(await this.dockerProbe())) {
-      return { deployed: false, id, note: 'docker not available; stub preview URL kept', url: aggregate.url };
+    const backend = await this.pickBackend();
+    if (backend === 'stub') {
+      return { deployed: false, id, backend, note: 'no docker/k8s runtime available; stub preview URL kept', url: aggregate.url };
     }
+    if (backend === 'k8s') {
+      return this.deployK8s(id, aggregate, opts?.image);
+    }
+    return this.deployDocker(id, aggregate, opts?.image);
+  }
 
-    const image = opts?.image || process.env.JACK_PREVIEW_IMAGE || DEFAULT_PREVIEW_IMAGE;
+  private async deployDocker(
+    id: string,
+    aggregate: PreviewEnvAggregate,
+    imageOpt?: string,
+  ): Promise<DeployResult> {
+    const image = imageOpt || process.env.JACK_PREVIEW_IMAGE || DEFAULT_PREVIEW_IMAGE;
     const container = `jack-preview-pr${aggregate.prNumber}-${id.slice(-8)}`;
     const port = 30000 + Math.floor(Math.random() * 9000);
     const isBusybox = image === DEFAULT_PREVIEW_IMAGE;
@@ -133,7 +180,7 @@ export class PreviewsService {
       await execAsync(command, { timeout: 120_000, windowsHide: true });
     } catch (err) {
       const e = err as { stderr?: string; message?: string };
-      return { deployed: false, id, note: `docker run failed: ${(e.stderr || e.message || '').slice(0, 200)}` };
+      return { deployed: false, id, backend: 'docker', note: `docker run failed: ${(e.stderr || e.message || '').slice(0, 200)}` };
     }
 
     const url = `http://localhost:${port}`;
@@ -144,11 +191,63 @@ export class PreviewsService {
         aggregateType: AGGREGATE.previewEnv,
         aggregateId: id,
         actor: { type: 'system', id: 'preview-runner' },
-        payload: { url, container, port, image },
+        payload: { url, container, port, image, backend: 'docker' },
       }),
     );
-    const view = await this.project(id);
-    return { deployed: true, id, url, container, port, image };
+    return { deployed: true, id, url, container, port, image, backend: 'docker' };
+  }
+
+  private async deployK8s(
+    id: string,
+    aggregate: PreviewEnvAggregate,
+    imageOpt?: string,
+  ): Promise<DeployResult> {
+    const image = imageOpt || process.env.JACK_PREVIEW_IMAGE || DEFAULT_PREVIEW_IMAGE;
+    const ns = process.env.JACK_K8S_NAMESPACE || 'default';
+    const name = `jack-preview-pr${aggregate.prNumber}-${id.slice(-8)}`.toLowerCase();
+    const svc = `${name}-svc`;
+    const isBusybox = image === DEFAULT_PREVIEW_IMAGE;
+    try {
+      await this.kubectl(['delete', 'pod', name, '-n', ns, '--ignore-not-found', '--wait=false']);
+      const runArgs = ['run', name, '-n', ns, '--image=' + image, '--restart=Never', '--port=80'];
+      if (isBusybox) {
+        runArgs.push('--', 'sh', '-c', `echo '<h1>preview ${name}</h1>' > index.html && httpd -f -p 80`);
+      }
+      await this.kubectl(runArgs);
+      await this.kubectl([
+        'expose', 'pod', name, '-n', ns, '--name=' + svc, '--port=80', '--type=NodePort',
+      ]);
+      const nodePortRaw = await this.kubectl([
+        'get', 'svc', svc, '-n', ns,
+        '-o', 'jsonpath={.spec.ports[0].nodePort}',
+      ]);
+      const nodeIp = await this.kubectl([
+        'get', 'nodes', '-o',
+        'jsonpath={.items[0].status.addresses[?(@.type=="InternalIP")].address}',
+      ]);
+      const port = Number.parseInt(nodePortRaw, 10);
+      const url = nodeIp && port ? `http://${nodeIp}:${port}` : `http://svc/${svc}`;
+      await this.eventStore.append(
+        makeEvent({
+          traceId: aggregate.traceId,
+          type: EVENT.previewEnvReady,
+          aggregateType: AGGREGATE.previewEnv,
+          aggregateId: id,
+          actor: { type: 'system', id: 'preview-runner' },
+          payload: { url, pod: name, service: svc, port, image, backend: 'k8s' },
+        }),
+      );
+      return { deployed: true, id, url, port, image, backend: 'k8s' };
+    } catch (err) {
+      const e = err as { stderr?: string; message?: string };
+      return { deployed: false, id, backend: 'k8s', note: `kubectl failed: ${(e.stderr || e.message || '').slice(0, 200)}` };
+    }
+  }
+
+  private kubectl(args: string[]): Promise<string> {
+    return execFileAsync('kubectl', args, { timeout: 60_000, windowsHide: true }).then(
+      (r) => r.stdout.trim(),
+    );
   }
 
   async markReady(id: string, url?: string): Promise<PreviewEnvView> {
@@ -180,7 +279,17 @@ export class PreviewsService {
     if (aggregate.status === 'destroyed') {
       throw new ConflictException(`preview env ${id} already destroyed`);
     }
-    if (aggregate.container) {
+    if (aggregate.backend === 'k8s' && aggregate.pod) {
+      const ns = process.env.JACK_K8S_NAMESPACE || 'default';
+      await this.kubectl(['delete', 'pod', aggregate.pod, '-n', ns, '--ignore-not-found', '--wait=false']).catch(
+        () => undefined,
+      );
+      if (aggregate.service) {
+        await this.kubectl(['delete', 'svc', aggregate.service ?? `${aggregate.pod}-svc`, '-n', ns, '--ignore-not-found']).catch(
+          () => undefined,
+        );
+      }
+    } else if (aggregate.container) {
       await execAsync(`docker rm -f ${aggregate.container}`, { windowsHide: true }).catch(() => undefined);
     }
     await this.eventStore.append(
@@ -267,6 +376,9 @@ export class PreviewsService {
         aggregate.container = ((event.payload.container as string | null) ?? aggregate.container) || undefined;
         aggregate.port = ((event.payload.port as number | null) ?? aggregate.port) || undefined;
         aggregate.image = ((event.payload.image as string | null) ?? aggregate.image) || undefined;
+        aggregate.backend = ((event.payload.backend as PreviewBackend | null) ?? aggregate.backend) || undefined;
+        aggregate.pod = ((event.payload.pod as string | null) ?? aggregate.pod) || undefined;
+        aggregate.service = ((event.payload.service as string | null) ?? aggregate.service) || undefined;
       } else if (event.type === EVENT.previewEnvDestroyed && aggregate) {
         aggregate.status = 'destroyed';
         aggregate.destroyedAt = event.occurredAt;
@@ -296,6 +408,9 @@ export class PreviewsService {
       container: aggregate.container,
       port: aggregate.port,
       image: aggregate.image,
+      backend: aggregate.backend,
+      pod: aggregate.pod,
+      service: aggregate.service,
     };
   }
 }

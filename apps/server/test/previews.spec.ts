@@ -94,14 +94,50 @@ describe('preview deploy runner (D8 real provisioning)', () => {
   it('degrades gracefully when docker is not available', async () => {
     const store = new InMemoryEventStore();
     const catalog = new CatalogService(store);
-    const previews = new PreviewsService(store, catalog, async () => false);
+    const previews = new PreviewsService(store, catalog, async () => false, async () => false);
     const service = await catalog.register({ name: '降级', slug: 'degrade-svc', ownerId: 'ops' });
     const preview = await previews.request({ serviceId: 'degrade-svc', prNumber: 5, actorId: 't' });
     const result = await previews.deploy(preview.id);
     expect(result.deployed).toBe(false);
-    expect(result.note).toMatch(/docker not available/);
+    expect(result.note).toMatch(/no docker\/k8s runtime available/);
     expect(result.url).toContain('preview-pr');
     expect(service).toBeTruthy();
+  });
+
+  it('backend auto-detect prefers docker, then k8s, then stub', async () => {
+    const store = new InMemoryEventStore();
+    const catalog = new CatalogService(store);
+    const service = await catalog.register({ name: '探测', slug: 'probe-svc', ownerId: 'ops' });
+
+    const both = new PreviewsService(store, catalog, async () => true, async () => true);
+    expect(await both.pickBackend()).toBe('docker');
+
+    const k8sOnly = new PreviewsService(store, catalog, async () => false, async () => true);
+    expect(await k8sOnly.pickBackend()).toBe('k8s');
+
+    const none = new PreviewsService(store, catalog, async () => false, async () => false);
+    expect(await none.pickBackend()).toBe('stub');
+
+    const forced = new PreviewsService(store, catalog, async () => true, async () => true);
+    expect(forced.resolveBackend('K8S')).toBe('k8s');
+    expect(forced.resolveBackend('docker')).toBe('docker');
+    expect(forced.resolveBackend('nonsense')).toBe('auto');
+    expect(service).toBeTruthy();
+  });
+
+  it('k8s backend reports kubectl failure without crashing the run', async () => {
+    const store = new InMemoryEventStore();
+    const catalog = new CatalogService(store);
+    const previews = new PreviewsService(store, catalog, async () => false, async () => true);
+    (previews as unknown as { kubectl: (args: string[]) => Promise<string> }).kubectl = async () => {
+      throw new Error('kubectl not found (stubbed)');
+    };
+    await catalog.register({ name: '集群', slug: 'k8s-svc', ownerId: 'ops' });
+    const preview = await previews.request({ serviceId: 'k8s-svc', prNumber: 3, actorId: 't' });
+    const result = await previews.deploy(preview.id, { image: 'busybox:latest' });
+    expect(result.backend).toBe('k8s');
+    expect(result.deployed).toBe(false);
+    expect(result.note).toMatch(/kubectl not found/i);
   });
 });
 

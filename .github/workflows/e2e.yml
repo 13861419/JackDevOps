@@ -1,0 +1,81 @@
+name: E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  browser-qa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Install Playwright
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+
+      - name: Start API server (memory mode)
+        run: |
+          node apps/server/dist/main.js &
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/previews || true)
+            [ "$code" = "200" ] || [ "$code" = "403" ] && break
+            sleep 1
+          done
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/previews || true)
+          { [ "$code" = "200" ] || [ "$code" = "403" ]; } || (echo "API not ready (code=$code)" && exit 1)
+
+      - name: Start web dev server
+        run: |
+          cd apps/web && nohup npx vite --port 5173 --strictPort >/tmp/vite.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:5173 >/dev/null && break
+            sleep 1
+          done
+          curl -sf http://localhost:5173 >/dev/null || (cat /tmp/vite.log && exit 1)
+
+      - name: Seed demo data
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf -X POST http://localhost:3000/demo/seed \
+              -H 'content-type: application/json' \
+              -H 'Authorization: Bearer dev-admin-token' \
+              -d '{"actorId":"ci-e2e"}' && break
+            sleep 1
+          done
+          curl -sf -X POST http://localhost:3000/demo/seed \
+            -H 'content-type: application/json' \
+            -H 'Authorization: Bearer dev-admin-token' \
+            -d '{"actorId":"ci-e2e"}' || (echo "seed failed" && exit 1)
+
+      - name: Run page QA (12 routes, zero console errors)
+        run: python apps/web/e2e/qa_ui.py
+
+      - name: Run interaction flows (4 flows)
+        run: python apps/web/e2e/qa_flow.py
+
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: apps/web/e2e/screenshots/
