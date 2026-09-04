@@ -13,6 +13,8 @@ interface PreviewEnv {
   status: 'creating' | 'ready' | 'destroyed';
   createdAt: string;
   ttlHours: number;
+  backend?: string;
+  note?: string;
 }
 
 const statusClass: Record<PreviewEnv['status'], string> = {
@@ -40,6 +42,16 @@ export default function Previews() {
     try {
       await api.post('/previews', { serviceId, prNumber: Number(prNumber) });
       setPrNumber('');
+      reload();
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const deploy = async (id: string): Promise<void> => {
+    setError('');
+    try {
+      await api.post(`/previews/${id}/deploy`, {});
       reload();
     } catch (e) {
       setError(String(e));
@@ -98,9 +110,12 @@ export default function Previews() {
               <td className="muted">{new Date(p.createdAt).toLocaleString()}</td>
               <td>
                 {p.status !== 'destroyed' && (
-                  <button className="ghost" onClick={() => void destroy(p.id)}>
-                    回收
-                  </button>
+                  <>
+                    <button onClick={() => void deploy(p.id)}>部署</button>{' '}
+                    <button className="ghost" onClick={() => void destroy(p.id)}>
+                      回收
+                    </button>
+                  </>
                 )}
               </td>
             </tr>

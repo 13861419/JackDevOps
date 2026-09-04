@@ -20,15 +20,16 @@ export class CatalogService {
 
   async register(input: {
     name: string;
-    slug: string;
+    slug?: string;
     repoUrl?: string;
     language?: string;
     ownerId: string;
     description?: string;
   }): Promise<ServiceView> {
-    const existing = await this.get(input.slug);
+    const slug = input.slug?.trim() || this.deriveSlug(input.name);
+    const existing = await this.get(slug);
     if (existing) {
-      throw new ConflictException(`service slug '${input.slug}' already registered`);
+      throw new ConflictException(`service slug '${slug}' already registered`);
     }
     const id = newId('svc');
     const event = makeEvent({
@@ -39,7 +40,7 @@ export class CatalogService {
       actor: { type: 'user', id: input.ownerId },
       payload: {
         name: input.name,
-        slug: input.slug,
+        slug,
         repoUrl: input.repoUrl ?? null,
         language: input.language ?? null,
         description: input.description ?? null,
@@ -47,6 +48,14 @@ export class CatalogService {
     });
     await this.eventStore.append(event);
     return { ...this.project(id, event) } as ServiceView;
+  }
+
+  private deriveSlug(name: string): string {
+    const ascii = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    return ascii || `svc-${Date.now().toString(36)}`;
   }
 
   async get(slug: string): Promise<ServiceView | null> {

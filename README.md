@@ -88,11 +88,13 @@ Git Push/PR ─▶ Webhook ─▶ 工作流引擎(DAG) ─▶ Job 执行器(buil
 
 | 文档 | 说明 |
 |---|---|
+| [docs/操作手册.md](docs/操作手册.md) | **用户操作手册：每个页面的使用步骤与常见问题** |
 | [docs/feature-inventory.md](docs/feature-inventory.md) | 30 项编号功能清单（唯一事实源） |
 | [docs/PRD.md](docs/PRD.md) | 痛点驱动的产品需求文档 |
 | [docs/competitive-analysis.md](docs/competitive-analysis.md) | 8 家竞品档案 + 痛点盲区矩阵 |
 | [docs/architecture.md](docs/architecture.md) | 分层架构、领域模型、事件溯源、dsh 融合方案 |
 | [docs/roadmap.md](docs/roadmap.md) | Phase 1~3 路线图与交付状态 |
+| [docs/design/multi-tenancy.md](docs/design/multi-tenancy.md) | 多租户设计（Phase 1~3） |
 
 ## 技术栈
 
