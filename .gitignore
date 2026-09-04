@@ -21,3 +21,4 @@ coverage/
 Thumbs.db
 
 apps/web/e2e/screenshots/
+.screenshot*.png
